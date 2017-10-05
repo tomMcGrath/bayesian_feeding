@@ -324,40 +324,6 @@ def get_colour(data):
 
     return c
 
-# def get_colour(data):
-#     drug, dose, recover, period = data
-
-#     """
-#     Define colourmaps
-#     """
-#     ## PYY
-#     PYY_dict = {1.5:5, 7.5:8, 300.0:10}
-#     PYY_norm = mpl.colors.Normalize(vmin = 0.0,
-#                                     vmax = 10)
-
-#     PYY_cmap = cm.Greens
-
-#     PYY_dose_col = cm.ScalarMappable(norm=PYY_norm, cmap=PYY_cmap)
-    
-#     """
-#     Now do the actual mapping
-#     """
-#     if drug == 'PYY':
-#         c = PYY_dose_col.to_rgba((PYY_dict[float(dose)]))
-#     elif drug == 'Lep':
-#         c = 'r'
-#     elif drug == 'LiCL':
-#         c = 'y'
-#     elif drug == 'saline' and recover == 'N':
-#         c = 'k'
-#     elif drug == 'saline' and recover == 'R':
-#         c = 'b'
-#     else:
-#         c = 'c' # CHANGEME
-#         #c = np.nan
-        
-#     return c
-
 
 """
 Posterior helper functions
@@ -384,12 +350,80 @@ def cov_from_chol(num_vars, chol):
         cov[i,:] = row_to_add
         
     cov = np.dot(cov, cov.T)
-        
-    #cov = cov + np.tril(cov).T
-    
-    #print cov
     
     return cov
+
+def make_index(trace, varname):
+    ## Get indices of individuals
+    rat_idx = np.unique(trace[varname][0,:], return_index=True)[1]
+    rat_idx = sorted(rat_idx)
+    return rat_idx
+
+def get_posterior(trace, idx, varlist):
+    ## Get posterior mean values    
+    theta_holder = []
+    for var in varlist:
+        theta_holder.append(get_indiv(trace[var], idx))
+
+    theta_holder = np.array(theta_holder).astype(float)
+    return theta_holder
+
+def make_pm_dataframe(trace, subjs, paths, varlist, datalist):
+    ## Get indices of individuals
+    rat_idx = make_index(trace, varlist[0])
+
+    ## Get posterior mean values    
+    theta_holder = get_posterior(trace, rat_idx, varlist)
+    theta_holder = np.mean(theta_holder, axis=1).T
+
+    ## Get rat information
+    data_holder = []
+    for i, subj in enumerate(subjs):
+        filepath = '/'.join(subj)
+        data = subj[1].split('_')
+        data[-1] = subj[1]
+        data = data + [subj[0]]
+        data_holder.append(data)
+
+    data_holder = np.array(data_holder)
+
+    ## Join the two into a dataframe
+    pre_df = np.concatenate([theta_holder, data_holder], axis=1)
+    columns = varlist + datalist
+    df = pd.DataFrame(pre_df, columns=columns)
+
+    ## Get feeding amount
+    def get_rate(row):
+        amt = amt_from_file(row['filepath'], row['filename'])
+        return amt/float(row['duration'])
+
+    df['rate'] = df.apply(get_rate, axis=1)
+
+    return df
+
+def make_posterior_dict(trace, subjs, paths, varlist):
+    ## Get indices of individuals
+    rat_idx = make_index(trace, varlist[0])
+
+    ## Get full posterior   
+    theta_holder = get_posterior(trace, rat_idx, varlist)
+
+    ## Create dictionary
+    post_dict = {}
+    for i, subj in enumerate(subjs):
+        ## Filepath will be dictionary key
+        filepath = '/'.join(subj)
+
+        ## Store the metadata (including amount eaten) in the dictionary
+        data = subj[1].split('_')
+        data[-1] = subj[1]
+        data = data + [subj[0]]
+        amt = amt_from_file(subj[0], subj[1])
+        data = [amt] + data
+
+        post_dict[filepath] = [data, theta_holder[:,:,i]]
+
+    return post_dict
 
 def sample_group(trace, group_id, sample_num):
     mu = trace['mu'][sample_num,group_id,:]
