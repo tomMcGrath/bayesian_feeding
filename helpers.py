@@ -105,13 +105,6 @@ def get_indiv(trace, idx):
     num_samples = trace.shape[0]
     data = trace[:, idx]
 
-    """    
-    data_holder = []
-    for i in range(0, num_samples):
-        data_holder.append(trace[i, idx])
-    
-    data = np.stack(data_holder)
-    """
     return data
 
 def get_indiv_theta(trace, idx):
@@ -129,47 +122,10 @@ def get_dataset(trace, rat_idx):
         post.append(trace[theta][:, rat_idx])
 
     return np.array(post)
-"""
-def infer_duration(filename):
-    ## NOTE - this is specific to this dataset
-    ## If you are using a new dataset or changing the window size, rewrite this function
-
-    drug, dose, recover, period, cage_id, date = filename.split('_')
-    date = date.split('.')[0] # strip end of filename
-
-    if drug == 'PYY':
-        return 8
-
-    elif drug == 'Lep':
-        return 8
-
-    elif drug == 'LiCL':
-        return 8
-
-    elif drug == 'saline' and date != '2015-11-23':
-        return 8 # normal dataset, not long-duration
-
-    elif drug == 'saline' and date == '2015-11-23' and recover == 'R' and period == 'D':
-        return 12
-
-    elif drug == 'saline' and date == '2015-11-23' and recover == 'R' and period == 'L':
-        return 12
-
-    elif drug == 'saline' and date == '2015-11-23' and recover == 'N' and period == 'D':
-        return 24
-
-    elif drug == 'saline' and date == '2015-11-23' and recover == 'N' and period == 'L':
-        return 24
-
-    else:
-        print "ERROR parsing filename ", filename
-        return 8 # CHANGEME
-"""
 
 def infer_duration(filename):
     drug, dose, recover, period, cage_id, duration, date = filename.split('_')
     return float(duration)
-
 
 def rate_from_file(path, filename):
     dur = infer_duration(filename)
@@ -183,9 +139,6 @@ def rate_from_file(path, filename):
     g_ends = data[:,4]
     
     qty = rates*f_lengths
-
-    #print qty
-    #print dur
 
     return sum(qty)/float(dur)
 
@@ -248,7 +201,6 @@ Trace processing functions
 """
 def run_name(tracename):
     return '_'.join(tracename.split('_')[:-1])
-
 
 
 """
@@ -368,7 +320,35 @@ def get_posterior(trace, idx, varlist):
     theta_holder = np.array(theta_holder).astype(float)
     return theta_holder
 
-def make_pm_dataframe(trace, subjs, paths, varlist, datalist):
+def make_single_pm_df(trace, filenames, varlist):
+    ## Get indices of individuals
+    rat_idx = make_index(trace, varlist[0])
+
+    ## Get posterior mean values
+    theta_holder = get_posterior(trace, rat_idx, varlist)
+    theta_holder = np.mean(theta_holder, axis=1).T
+
+    ## Get rat info
+    data_holder = []
+    for i, filename in enumerate(filenames):
+        data = filename.split('_')
+        filepath = 'new_all_data/'+'_'.join(data[:4])
+        amt = amt_from_file(filepath, filename)
+        rate = amt/float(data[5]) # row[5] is duration
+        print filepath + '/' + filename
+        x0 = np.loadtxt(filepath+'/'+filename, delimiter='\t', usecols=(0,1,2,3,4))[0][1] # g_start
+        data = data + [filepath, rate, x0]
+        data_holder.append(data)
+
+    ## Create the dataframe
+    datalist = ['drug', 'dose', 'adlib', 'period', 'id', 'duration', 'filename', 'filepath', 'rate', 'x0']
+    pre_df = np.concatenate([theta_holder, data_holder], axis=1)
+    columns = varlist + datalist
+    df = pd.DataFrame(pre_df, columns=columns)
+
+    return df
+
+def make_pm_dataframe(trace, subjs, varlist, datalist):
     ## Get indices of individuals
     rat_idx = make_index(trace, varlist[0])
 
