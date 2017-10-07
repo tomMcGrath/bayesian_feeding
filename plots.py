@@ -413,3 +413,39 @@ def intake_fullness(df, cutoff=300):
 """
 Figure 4
 """
+def termination_prob(data_dict):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	x_vals = np.linspace(0, 20,100)
+	for key in data_dict.keys():
+		post = data_dict[key]
+		theta4 = post[:,3]
+		theta5 = post[:,4]
+		data = key.split('_')[:-1]
+		c = helpers.get_colour(data)
+
+
+		sig_min, sig_mean, sig_max, sig_int = helpers.get_Q(x_vals, theta4, theta5)
+
+		axes.plot(x_vals, sig_mean, c=c)
+
+	return fig, axes
+
+def param_change_effect(data_dict, indiv, param_idx, delta, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	post = data_dict[indiv]
+	post = np.mean(post, axis=0)
+	perturbed_params = np.copy(post)
+	perturbed_params[param_idx] = perturbed_params[param_idx] + delta
+	
+	baseline_samples = []
+	perturbed_samples = []
+	for i in range(num_samples):
+		baseline_samples.append(fs.sample(duration, post, 0)[1])
+		perturbed_samples.append(fs.sample(duration, perturbed_params, 0)[1])
+
+	axes.hist(baseline_samples, color='b', bins=20)
+	axes.hist(perturbed_samples, color='r', bins=20)
+
+	return fig, axes
