@@ -196,6 +196,26 @@ def group_amts(folder):
 
     return amts
 
+def get_filename(row):
+    filename = '_'.join([row['drug'], 
+                    str(row['dose']), 
+                    row['adlib'],
+                    row['period'],
+                    str(row['id']),
+                    str(row['duration']),
+                    row['filename']])
+
+    return filename
+
+
+def data_from_row(row):
+    filename = get_filename(row)
+
+    filepath = row['filepath']
+
+    data = np.loadtxt(filepath+'/'+filename, delimiter='\t', usecols=(0,1,2,3,4))
+    return data
+
 """
 Trace processing functions
 """
@@ -335,7 +355,7 @@ def make_single_pm_df(trace, filenames, varlist):
         filepath = 'new_all_data/'+'_'.join(data[:4])
         amt = amt_from_file(filepath, filename)
         rate = amt/float(data[5]) # row[5] is duration
-        print filepath + '/' + filename
+        #print filepath + '/' + filename
         x0 = np.loadtxt(filepath+'/'+filename, delimiter='\t', usecols=(0,1,2,3,4))[0][1] # g_start
         data = data + [filepath, rate, x0]
         data_holder.append(data)
@@ -381,6 +401,40 @@ def make_pm_dataframe(trace, subjs, varlist, datalist):
 
     return df
 
+def add_post_sample_dict(data_dict, trace, subjs, varlist, num_samples=100):
+    ## Get indices of individuals
+    rat_idx = make_index(trace, varlist[0])
+
+    ## Get posterior mean values    
+    theta_holder = get_posterior(trace, rat_idx, varlist)
+    post_size = theta_holder.shape[1]
+
+    ## Sample from posterior
+    sample_idx = np.random.randint(0, post_size, num_samples)
+    samples = theta_holder[:, sample_idx, :]
+
+    ## Get rat information
+    for i, subj in enumerate(subjs):
+        data_dict[subj] = samples[:,:,i]
+
+    return data_dict
+
+def add_group_post_dict(data_dict, trace, filename, num_samples=100):
+    ## Extract group mean posterior only
+    group_means = trace['mu']
+    post_size = group_means.shape[0]
+
+    ## Sample from posterior
+    sample_idx = np.random.randint(0, post_size, num_samples)
+    samples = group_means[sample_idx, :]
+
+    ## Store in the dict
+    data_dict[filename.split('/')[1]] = samples
+
+    return data_dict
+
+
+"""
 def make_posterior_dict(trace, subjs, paths, varlist):
     ## Get indices of individuals
     rat_idx = make_index(trace, varlist[0])
@@ -404,7 +458,7 @@ def make_posterior_dict(trace, subjs, paths, varlist):
         post_dict[filepath] = [data, theta_holder[:,:,i]]
 
     return post_dict
-
+"""
 def sample_group(trace, group_id, sample_num):
     mu = trace['mu'][sample_num,group_id,:]
     

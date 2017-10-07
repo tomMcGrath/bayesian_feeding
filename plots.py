@@ -9,6 +9,27 @@ import fwd_sample as fs
 import fwd_likelihoods as fl
 import scipy
 
+"""
+Figure prelims
+"""
+def compare_sample(df, data_dict, varlist, idx):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+	var = varlist[idx]
+	
+	def compare(row):
+		x = row[var]
+		filename = helpers.get_filename(row)
+		post = data_dict[filename]
+		y = np.mean(post, axis=1)[idx]
+		axes.scatter(x, x-y)
+
+	df.apply(compare, axis=1)
+
+	return fig, axes
+
+"""
+Figure 1
+"""
 def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=60*60):
 	k1 = 0.00055
 	theta7 = np.power(10., thetas[6])
@@ -108,18 +129,28 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 
 	return fig, axes
 
+"""
+Figure 2
+"""
+def pairplot(df, var1, var2, ctype='drug_c'):
+	fig, axes = plt.subplots(1, figsize=(10,10))
 
+	def plot_pairs(row):
+		x = row[var1]
+		y = row[var2]
+		c = row[ctype]
+		ms = row['ms']
 
-		
+		axes.scatter(x, y, c=c, marker=ms)
 
+	df.apply(plot_pairs, axis=1)
 
-def pairplot(df, vars, c, ms, fig, axes):
-	return 0
+	return fig, axes
 
-
-def trellisplot(df, varlist, fig, axes):
+def trellisplot(df, varlist):
 	## Prepare the figure
 	num_vars = len(varlist)
+	fig, axes = plt.subplots(num_vars, num_vars, figsize=(10,10))
 
 	## Plot the data
 	for i, var1 in enumerate(varlist):
@@ -149,8 +180,236 @@ def trellisplot(df, varlist, fig, axes):
 				text = '$r^{2} = %0.2f$\n$p=%1.0e$' %(r_value**2, p_value)
 				axes[i, j].text(0.15, 0.4, text, fontsize=16)
 
+	return fig, axes
 
-	## Tidy up the plot
+def univariate_posterior(data_dict, idx, numbins=50):
+	fig, axes = plt.subplots(2, 1, figsize=(10,10))
+
+	for key in data_dict.keys():
+		dataset = data_dict[key][:, idx]
+		data = key.split('_')[:-1]
+		c = helpers.get_colour(data)
+		print data
+
+		if data[3] == 'D':
+			axes[0].hist(dataset, bins=numbins, color=c, histtype='step')
+
+		else:
+			axes[1].hist(dataset, bins=numbins, color=c, histtype='step')
 
 
 	return fig, axes
+
+"""
+Figure 3
+"""
+def IMI_curve(group_dict, numpoints=10, num_resamples=10):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+	k1 = 0.00055
+
+	x0_vals = np.linspace(0, 20, numpoints)
+
+	for key in group_dict.keys():
+		group_post = group_dict[key]
+		data = key.split('_')[:-1]
+		c = helpers.get_colour(data)
+
+		predicted_IMIs = []
+		for x0 in x0_vals:
+			this_x0_predictions = []
+			for sample in group_post:
+				theta7 = np.power(10., sample[6])
+				theta8 = np.power(10., sample[7])
+
+				for repeat in range(num_resamples):
+					this_x0_predictions.append(fl.sample_L(x0, k1, theta7, theta8))
+
+			predicted_IMIs.append(np.mean(this_x0_predictions))
+
+		axes.plot(x0_vals, predicted_IMIs, c=c)
+
+	return fig, axes
+
+
+
+def IMI_fullness(df, cutoff=300):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+	k1 = 0.00055
+
+	def fullness_IMI(row):
+		## Import the meal data for this animal
+		data = helpers.data_from_row(row)
+
+		## Iterate through the bouts, getting x0 and IMI once pause length exceeds cutoff
+		true_IMIs = []
+		g_ends = [] # predictions based on individual posterior means
+
+		for event in data:
+			f_length, g_start, rate, p_length, g_end_feeding = event
+
+			IMI_samples = []
+			if p_length > cutoff:
+				g_ends.append(g_end_feeding)
+				true_IMIs.append(p_length)
+
+		## Plot the results
+		axes.scatter(g_ends, true_IMIs, c=row['rate_c'])
+
+	## Iterate over the dataset
+	df.apply(fullness_IMI, axis=1)
+
+	## Axes labels etc
+	axes.set_xlabel('Stomach fullness')
+	axes.set_ylabel('Observed IMI')
+
+	#axes.set_yscale('log')
+
+	return fig, axes
+
+def IMI_prediction(df, num_samples=10, cutoff=300):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+	k1 = 0.00055
+
+	def predict_IMI(row):
+		## Import the meal data for this animal
+		data = helpers.data_from_row(row)
+
+		## Get PM thetas
+		theta7 = np.power(10., row['theta7'])
+		theta8 = np.power(10., row['theta8'])
+
+		## Iterate through the bouts, getting x0 and IMI once pause length exceeds cutoff
+		true_IMIs = []
+		indiv_predicts = [] # predictions based on individual posterior means
+
+		for event in data:
+			f_length, g_start, rate, p_length, g_end_feeding = event
+
+			IMI_samples = []
+			if p_length > cutoff:
+				x0 = g_end_feeding
+				true_IMIs.append(p_length)
+
+				for i in range(0, num_samples):
+					IMI_samples.append(fl.sample_L(x0, k1, theta7, theta8))
+
+				indiv_predicts.append(np.mean(IMI_samples))
+
+		## Plot the results
+		axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'])
+
+	## Iterate over the dataset
+	df.apply(predict_IMI, axis=1)
+
+	## Axes labels etc
+	axes.set_xlabel('True IMI')
+	axes.set_ylabel('Predicted IMI')
+
+	axes.set_xlim([0, 20000])
+	axes.set_ylim([0, 20000])
+
+	x = np.linspace(0, 60000, 10)
+	axes.plot(x, x, c='k', ls='--')
+
+	return fig, axes
+
+def predict_IMI_full_post(df, data_dict, num_resamples=1, cutoff=300):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+	k1 = 0.00055
+
+	def predict_IMI(row):
+		## Import the meal data for this animal
+		data = helpers.data_from_row(row)
+
+		## Iterate through the bouts, getting x0 and IMI once pause length exceeds cutoff
+		true_IMIs = []
+		indiv_predicts = [] # predictions based on individual posterior means
+		indiv_errs = []
+
+		## Load the posterior sample dictionary
+		filename = helpers.get_filename(row)
+		post = data_dict[filename]
+
+		for event in data:
+			f_length, g_start, rate, p_length, g_end_feeding = event
+
+			IMI_samples = []
+			if p_length > cutoff:
+				x0 = g_end_feeding
+				true_IMIs.append(p_length)
+
+				for i in range(post.shape[1]):
+					post_sample = post[:,i]
+					theta7 = np.power(10., post_sample[6])
+					theta8 = np.power(10., post_sample[7])
+					IMI_samples.append(fl.sample_L(x0, k1, theta7, theta8))
+
+				indiv_predicts.append(np.mean(IMI_samples))
+				indiv_errs.append(np.std(IMI_samples))
+
+		## Plot the results
+		axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'], marker=row['ms'])
+		"""
+		axes.errorbar(true_IMIs, 
+					  indiv_predicts, 
+					  yerr=indiv_errs, 
+					  c=row['drug_c'], 
+					  fmt='o',
+					  marker=row['ms'])
+		"""
+	## Iterate over the dataset
+	df.apply(predict_IMI, axis=1)
+
+	## Axes labels etc
+	axes.set_xlabel('True IMI')
+	axes.set_ylabel('Predicted IMI')
+
+	axes.set_xlim([0, 20000])
+	axes.set_ylim([0, 20000])
+
+	x = np.linspace(0, 60000, 10)
+	axes.plot(x, x, c='k', ls='--')
+
+	return fig, axes
+
+def intake_fullness(df, cutoff=300):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	def plot_meals(row):
+		## Import the meal data for this animal
+		data = helpers.data_from_row(row)
+		
+		## Iterate through the bouts, storing meal data once pause length exceeds cutoff
+		mealsizes = []
+		gut_ends = []
+		this_mealsize = 0
+		for event in data:
+			f_length, g_start, rate, p_length, g_end_feeding = event
+
+			if p_length > cutoff:
+				this_mealsize += 3.5*rate*f_length # add the feeding in this meal
+				mealsizes.append(this_mealsize) # store
+				this_mealsize = 0 # reset for next meal
+				gut_ends.append(g_end_feeding) # store g_end
+
+			else:
+				this_mealsize += 3.5*rate*f_length
+
+		c = row['rate_c']
+		ms = row['ms']
+
+		axes.scatter(gut_ends, mealsizes, c=c, marker=ms)
+
+	## Apply the plot function across the dataset
+	df.apply(plot_meals, axis=1)
+
+	## Set labels etc
+	axes.set_xlabel('Stomach fullness at meal termination (kcal)')
+	axes.set_ylabel('Meal size (kcal)')
+
+
+	return fig, axes
+
+"""
+Figure 4
+"""
