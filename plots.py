@@ -203,11 +203,11 @@ def univariate_posterior(data_dict, idx, numbins=50):
 """
 Figure 3
 """
-def IMI_curve(group_dict, numpoints=10, num_resamples=10):
+def IMI_curve(group_dict, num_points=10, num_resamples=10):
 	fig, axes = plt.subplots(1, figsize=(10,10))
 	k1 = 0.00055
 
-	x0_vals = np.linspace(0, 20, numpoints)
+	x0_vals = np.linspace(0, 20, num_points)
 
 	for key in group_dict.keys():
 		group_post = group_dict[key]
@@ -230,8 +230,6 @@ def IMI_curve(group_dict, numpoints=10, num_resamples=10):
 
 	return fig, axes
 
-
-
 def IMI_fullness(df, cutoff=300):
 	fig, axes = plt.subplots(1, figsize=(10,10))
 	k1 = 0.00055
@@ -253,7 +251,7 @@ def IMI_fullness(df, cutoff=300):
 				true_IMIs.append(p_length)
 
 		## Plot the results
-		axes.scatter(g_ends, true_IMIs, c=row['rate_c'])
+		axes.scatter(g_ends, true_IMIs, c=row['rate_c'], alpha=0.3)
 
 	## Iterate over the dataset
 	df.apply(fullness_IMI, axis=1)
@@ -262,7 +260,7 @@ def IMI_fullness(df, cutoff=300):
 	axes.set_xlabel('Stomach fullness')
 	axes.set_ylabel('Observed IMI')
 
-	#axes.set_yscale('log')
+	axes.set_yscale('log')
 
 	return fig, axes
 
@@ -296,7 +294,9 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 				indiv_predicts.append(np.mean(IMI_samples))
 
 		## Plot the results
-		axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'])
+		#axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'], alpha=0.1)
+		#axes.scatter(true_IMIs, indiv_predicts, c=row['rate_c'], alpha=0.1)
+		axes.scatter(true_IMIs, indiv_predicts, c='b', alpha=0.1)
 
 	## Iterate over the dataset
 	df.apply(predict_IMI, axis=1)
@@ -305,11 +305,14 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 	axes.set_xlabel('True IMI')
 	axes.set_ylabel('Predicted IMI')
 
-	axes.set_xlim([0, 20000])
-	axes.set_ylim([0, 20000])
+	#axes.set_xlim([0, 5000])
+	#axes.set_ylim([0, 5000])
 
-	x = np.linspace(0, 60000, 10)
+	x = np.linspace(cutoff, 60000, 10)
 	axes.plot(x, x, c='k', ls='--')
+
+	axes.set_xscale('log')
+	axes.set_yscale('log')
 
 	return fig, axes
 
@@ -369,6 +372,64 @@ def predict_IMI_full_post(df, data_dict, num_resamples=1, cutoff=300):
 
 	x = np.linspace(0, 60000, 10)
 	axes.plot(x, x, c='k', ls='--')
+
+	return fig, axes
+
+def IMI_prediction_KDEmax(df, num_samples=10, cutoff=300):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+	k1 = 0.00055
+
+	def predict_IMI(row):
+		## Import the meal data for this animal
+		data = helpers.data_from_row(row)
+
+		## Get PM thetas
+		theta7 = np.power(10., row['theta7'])
+		theta8 = np.power(10., row['theta8'])
+
+		## Iterate through the bouts, getting x0 and IMI once pause length exceeds cutoff
+		true_IMIs = []
+		indiv_predicts = [] # predictions based on individual posterior means
+
+		for event in data:
+			f_length, g_start, rate, p_length, g_end_feeding = event
+
+			IMI_samples = []
+			if p_length > cutoff:
+				x0 = g_end_feeding
+				true_IMIs.append(p_length)
+
+				for i in range(0, num_samples):
+					IMI_samples.append(fl.sample_L(x0, k1, theta7, theta8))
+
+				## Make a KDE of the samples and find the maximum value
+				x_grid = np.linspace(0, max(IMI_samples), 10000)
+				kde = scipy.stats.gaussian_kde(IMI_samples)
+				kde_vals = kde.evaluate(x_grid)
+				KDEmax = np.argmax(kde_vals)
+				#print x_grid[KDEmax]
+				indiv_predicts.append(x_grid[KDEmax])
+
+		## Plot the results
+		#axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'], alpha=0.1)
+		#axes.scatter(true_IMIs, indiv_predicts, c=row['rate_c'], alpha=0.1)
+		axes.scatter(true_IMIs, indiv_predicts, c='b', alpha=0.1)
+
+	## Iterate over the dataset
+	df.apply(predict_IMI, axis=1)
+
+	## Axes labels etc
+	axes.set_xlabel('True IMI')
+	axes.set_ylabel('Predicted IMI')
+
+	#axes.set_xlim([0, 5000])
+	#axes.set_ylim([0, 5000])
+
+	x = np.linspace(cutoff, 60000, 10)
+	axes.plot(x, x, c='k', ls='--')
+
+	axes.set_xscale('log')
+	axes.set_yscale('log')
 
 	return fig, axes
 
@@ -447,5 +508,109 @@ def param_change_effect(data_dict, indiv, param_idx, delta, num_samples=100, dur
 
 	axes.hist(baseline_samples, color='b', bins=20)
 	axes.hist(perturbed_samples, color='r', bins=20)
+
+	return fig, axes
+
+"""
+Figure 5
+"""
+def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
+	## NOTE: currently does not switch posterior through a long pause
+	## This should probably be fixed
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	max_duration = 3600*sum([i[0] for i in protocol])
+
+	## Repeatedly sample from the posteriors sequentially
+	all_ts = []
+	amounts = []
+	for i in range(0, num_samples):
+		x0 = 0
+		total_amount = 0
+		time_series = [[x0]]
+		
+		for state in protocol:
+			duration = state[0]*3600
+			post = np.mean(data_dict[state[1]], axis=0)
+			x0 = time_series[-1][-1]
+			results = fs.sample(duration, post, x0, init_state='F')
+			
+			time_series.append(results[0])
+			total_amount += results[1]
+			
+			## Use cutoff to check pause state
+			events = results[-1]
+			if events[-1][3] > cutoff: # would need to redo sampling to get last state otherwise
+				final_state = 'L'
+
+			else:
+				final_state = 'S'
+
+		time_series = np.hstack(time_series)
+		all_ts.append(time_series[:max_duration])
+		amounts.append(total_amount)
+
+	## Plot mean time series and bounds
+	all_ts = np.array(all_ts)
+	xax = np.arange(all_ts.shape[1])
+	axes.plot(np.mean(all_ts, axis=0), c='r')
+	axes.fill_between(xax,
+					  np.percentile(all_ts, 2.5, axis=0), 
+					  np.percentile(all_ts, 97.5, axis=0),
+					  color='r',
+					  alpha=0.3)
+
+	## Plot a sample time series (the last one)
+	axes.plot(time_series[:max_duration])
+
+	## Plot the protocol bars
+	## TODO: make for general protocols
+	protocol1 = np.arange(protocol[0][0]*3600)
+	bar = np.zeros(protocol1.shape[0])
+	axes.plot(protocol1, bar, c='k')
+
+	print np.mean(amounts), np.std(amounts)
+
+	return fig, axes
+
+def behav_change_effect_group(data_dict, groupname, xmax, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	post = data_dict[groupname]
+	post = np.mean(post, axis=0)
+	
+	baseline_samples = []
+	perturbed_samples = []
+	for i in range(num_samples):
+		baseline_samples.append(fs.sample(duration, post, 0)[1])
+		perturbed_samples.append(fs.sample_lim_x(duration, post, 0, xmax)[1])
+
+	axes.hist(baseline_samples, color='b', bins=20, normed=True)
+	axes.hist(perturbed_samples, color='r', bins=20, normed=True)
+
+	return fig, axes
+
+def behav_change_effect_indiv(df, xmax, thetas, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(8,1, figsize=(10,10))
+
+	def calc_change(row):
+		post = row[thetas]
+
+		true_val = row['rate']
+		c = row['drug_c']
+		ms = row['ms']
+		x0 = float(row['x0'])
+
+		samples = []
+		for i in range(num_samples):
+			samples.append(fs.sample_lim_x(duration, post, x0, xmax)[1])
+
+		delta = 3600.*np.mean(samples)/duration - true_val
+
+		for i in range(0, 8):
+			axes[i].scatter(post[i], delta, c=c, marker=ms)
+
+	## Iterate the plotter over the dataframe
+	df.apply(calc_change, axis=1)
 
 	return fig, axes
