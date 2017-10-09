@@ -8,6 +8,7 @@ import scipy
 import fwd_sample as fs
 import fwd_likelihoods as fl
 import scipy
+import itertools
 
 """
 Figure prelims
@@ -291,7 +292,7 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 				for i in range(0, num_samples):
 					IMI_samples.append(fl.sample_L(x0, k1, theta7, theta8))
 
-				indiv_predicts.append(np.mean(IMI_samples))
+				indiv_predicts.append(1.5*np.mean(IMI_samples))
 
 		## Plot the results
 		#axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'], alpha=0.1)
@@ -305,14 +306,14 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 	axes.set_xlabel('True IMI')
 	axes.set_ylabel('Predicted IMI')
 
-	#axes.set_xlim([0, 5000])
-	#axes.set_ylim([0, 5000])
+	axes.set_xlim([0, 20000])
+	axes.set_ylim([0, 20000])
 
 	x = np.linspace(cutoff, 60000, 10)
 	axes.plot(x, x, c='k', ls='--')
 
-	axes.set_xscale('log')
-	axes.set_yscale('log')
+	#axes.set_xscale('log')
+	#axes.set_yscale('log')
 
 	return fig, axes
 
@@ -515,43 +516,12 @@ def param_change_effect(data_dict, indiv, param_idx, delta, num_samples=100, dur
 Figure 5
 """
 def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
-	## NOTE: currently does not switch posterior through a long pause
-	## This should probably be fixed
 	fig, axes = plt.subplots(1, figsize=(10,10))
 
-	max_duration = 3600*sum([i[0] for i in protocol])
-
-	## Repeatedly sample from the posteriors sequentially
-	all_ts = []
-	amounts = []
-	for i in range(0, num_samples):
-		x0 = 0
-		total_amount = 0
-		time_series = [[x0]]
-		
-		for state in protocol:
-			duration = state[0]*3600
-			post = np.mean(data_dict[state[1]], axis=0)
-			x0 = time_series[-1][-1]
-			results = fs.sample(duration, post, x0, init_state='F')
-			
-			time_series.append(results[0])
-			total_amount += results[1]
-			
-			## Use cutoff to check pause state
-			events = results[-1]
-			if events[-1][3] > cutoff: # would need to redo sampling to get last state otherwise
-				final_state = 'L'
-
-			else:
-				final_state = 'S'
-
-		time_series = np.hstack(time_series)
-		all_ts.append(time_series[:max_duration])
-		amounts.append(total_amount)
+	## Do the sampling
+	amounts, all_ts, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff)
 
 	## Plot mean time series and bounds
-	all_ts = np.array(all_ts)
 	xax = np.arange(all_ts.shape[1])
 	axes.plot(np.mean(all_ts, axis=0), c='r')
 	axes.fill_between(xax,
@@ -561,7 +531,7 @@ def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
 					  alpha=0.3)
 
 	## Plot a sample time series (the last one)
-	axes.plot(time_series[:max_duration])
+	axes.plot(last_ts)
 
 	## Plot the protocol bars
 	## TODO: make for general protocols
@@ -572,6 +542,31 @@ def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
 	print np.mean(amounts), np.std(amounts)
 
 	return fig, axes
+
+def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default=2, num_samples=10, cutoff=300):
+	## NOTE: default drug is the first one in the list
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	## Create protocol list
+	protocol_list = helpers.make_protocol_list(druglist, protocol_size, duration, min_default)
+
+	## Iterate over protocols
+	mean_amounts = []
+	for protocol in protocol_list:
+		amounts, all_ts, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff)
+		mean_amounts.append(np.mean(amounts))
+
+	## Plot policy ranking
+	protocols_to_rank = zip(mean_amounts, protocol_list)
+	ranked_protocols = sorted(protocols_to_rank, key=lambda x:x[0])
+	xax = np.arange(len(mean_amounts))
+	amounts_to_plot = [i[0] for i in ranked_protocols] # extract amount eaten
+	axes.scatter(xax, amounts_to_plot) # could do errorbar for SEM if necessary/useful
+
+	print ranked_protocols[0]
+	print ranked_protocols[-1]
+
+	return fig, axes, ranked_protocols
 
 def behav_change_effect_group(data_dict, groupname, xmax, num_samples=100, duration=8*60*60):
 	fig, axes = plt.subplots(1, figsize=(10,10))

@@ -5,6 +5,8 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 import pymc3 as pm
 import pandas as pd
+import fwd_sample as fs
+import itertools
 
 """
 Data cleaning helper functions
@@ -521,3 +523,70 @@ def get_Q(xvals, theta5, theta6, percentile=5):
 """
 Forward sampling helper functions
 """
+def make_protocol_list(druglist, protocol_size, duration, min_default):
+    default_drug = druglist[0]
+    protocol_list = itertools.combinations_with_replacement(druglist, protocol_size)
+    
+    ## Get all unique protocols
+    protocols = []
+    for i in protocol_list:
+        perms = itertools.permutations(i)
+        for j in perms:
+            if j not in protocols:
+                protocols.append(j)
+
+    ## Add duration information
+    protocols_with_durations = []
+    for protocol in protocols:
+        default_count = 0
+        new_protocol = []
+        for part in protocol:
+            new_protocol.append((duration, part))
+            if part == default_drug:
+                default_count += 1
+
+        if default_count >= min_default:
+            protocols_with_durations.append(new_protocol)
+
+        else: continue
+
+    return protocols_with_durations
+
+def sample_protocol(data_dict, protocol, num_samples, cutoff):
+    ## NOTE: currently does not switch posterior through a long pause
+    ## This should probably be fixed
+    max_duration = 3600*sum([i[0] for i in protocol])
+
+    ## Repeatedly sample from the posteriors sequentially
+    all_ts = []
+    amounts = []
+    for i in range(0, num_samples):
+        x0 = 0
+        total_amount = 0
+        time_series = [[x0]]
+        
+        for state in protocol:
+            duration = state[0]*3600
+            post = np.mean(data_dict[state[1]], axis=0)
+            x0 = time_series[-1][-1]
+            results = fs.sample(duration, post, x0, init_state='F')
+            
+            time_series.append(results[0])
+            total_amount += results[1]
+            
+            ## Use cutoff to check pause state
+            events = results[-1]
+            if events[-1][3] > cutoff: # would need to redo sampling to get last state otherwise
+                final_state = 'L'
+
+            else:
+                final_state = 'S'
+
+        time_series = np.hstack(time_series)
+        all_ts.append(time_series[:max_duration])
+        amounts.append(total_amount)
+
+    all_ts = np.array(all_ts)
+    last_ts = time_series[:max_duration]
+
+    return amounts, all_ts, last_ts
