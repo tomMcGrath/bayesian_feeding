@@ -552,7 +552,7 @@ def make_protocol_list(druglist, protocol_size, duration, min_default):
 
     return protocols_with_durations
 
-def sample_protocol(data_dict, protocol, num_samples, cutoff):
+def sample_protocol(data_dict, protocol, num_samples, cutoff, pc=5):
     ## NOTE: currently does not switch posterior through a long pause
     ## This should probably be fixed
     max_duration = 3600*sum([i[0] for i in protocol])
@@ -589,4 +589,9 @@ def sample_protocol(data_dict, protocol, num_samples, cutoff):
     all_ts = np.array(all_ts)
     last_ts = time_series[:max_duration]
 
-    return amounts, all_ts, last_ts
+    ts_mean = np.mean(all_ts, axis=0)
+    ts_pc_low = np.percentile(all_ts, pc, axis=0)
+    ts_pc_high = np.percentile(all_ts, 100-pc, axis=0)
+    ts_pc = (ts_pc_low, ts_pc_high)
+
+    return amounts, ts_mean, ts_pc, last_ts

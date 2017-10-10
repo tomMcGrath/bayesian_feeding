@@ -90,8 +90,8 @@ def PDF_F(t, x0, rate, theta1):
     return ans
 
 def PDF_L(t, x0, k1, theta8, theta9):
-    psi = psi_L(t, x0, k1, theta8, theta9)
-    phi = phi_L(t, x0, k1, theta8, theta9)
+    psi = psi_L_an(t, x0, k1, theta8, theta9)
+    phi = phi(t, x0, k1, theta8, theta9)
     ans = phi*np.exp(-psi)
     return ans
 

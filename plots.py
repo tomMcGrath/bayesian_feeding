@@ -543,28 +543,70 @@ def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
 
 	return fig, axes
 
-def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default=2, num_samples=10, cutoff=300):
+def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default=2, num_samples=10, cutoff=300, pc=5):
 	## NOTE: default drug is the first one in the list
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(3, 1, figsize=(10,10))
 
 	## Create protocol list
 	protocol_list = helpers.make_protocol_list(druglist, protocol_size, duration, min_default)
 
 	## Iterate over protocols
 	mean_amounts = []
+	all_amounts = []
+	time_series = []
 	for protocol in protocol_list:
-		amounts, all_ts, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff)
+		amounts, ts_mean, ts_pc, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff, 5)
 		mean_amounts.append(np.mean(amounts))
+		time_series.append((ts_mean, ts_pc))
+		all_amounts.append(amounts)
 
 	## Plot policy ranking
 	protocols_to_rank = zip(mean_amounts, protocol_list)
 	ranked_protocols = sorted(protocols_to_rank, key=lambda x:x[0])
 	xax = np.arange(len(mean_amounts))
 	amounts_to_plot = [i[0] for i in ranked_protocols] # extract amount eaten
-	axes.scatter(xax, amounts_to_plot) # could do errorbar for SEM if necessary/useful
+	axes[0].scatter(xax, amounts_to_plot) # could do errorbar for SEM if necessary/useful
 
-	print ranked_protocols[0]
-	print ranked_protocols[-1]
+	## Plot optimal & pessimal protocol stomach fullness
+	protocols_to_rank = zip(mean_amounts, time_series)
+	ranked_protocols = sorted(protocols_to_rank, key=lambda x:x[0])
+	opt_protocol = ranked_protocols[0]
+	pess_protocol = ranked_protocols[-1]
+
+	## This is a bit hacky but works OK
+	opt_mean = opt_protocol[1][0]
+	opt_pc = opt_protocol[1][1]
+	opt_pc_low = opt_pc[0]
+	opt_pc_high = opt_pc[1]
+
+	pess_mean = pess_protocol[1][0]
+	pess_pc = pess_protocol[1][1]
+	pess_pc_low = pess_pc[0]
+	pess_pc_high = pess_pc[1]
+	
+	xax = np.arange(len(opt_mean))
+
+	axes[1].plot(opt_mean, c='b')
+	axes[1].fill_between(xax,
+				  		 opt_pc_low, 
+				  		 opt_pc_high,
+				  		 color='b',
+				  		 alpha=0.3)
+
+	axes[1].plot(pess_mean, c='r')
+	axes[1].fill_between(xax,
+			  		 	 pess_pc_low, 
+			  			 pess_pc_high,
+			  			 color='r',
+			  			 alpha=0.3)
+
+	## Plot amount distributions for optimal & pessimal protocols
+	protocols_to_rank = zip(mean_amounts, all_amounts)
+	ranked_protocols = sorted(protocols_to_rank, key=lambda x:x[0])
+	opt_protocol = ranked_protocols[0]
+	pess_protocol = ranked_protocols[-1]
+	axes[2].hist(opt_protocol[1], color='b', bins=20, normed=True)
+	axes[2].hist(pess_protocol[1], color='r', bins=20, normed=True)
 
 	return fig, axes, ranked_protocols
 
