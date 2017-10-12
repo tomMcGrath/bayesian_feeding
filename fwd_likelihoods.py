@@ -135,9 +135,9 @@ def sample_F(x0, rate, theta1):
     ans = CDF_inv_F(u, x0, rate, theta1)
     return ans
 
-def sample_L(x0, k1, theta8, theta9):
+def sample_L(x0, k1, theta7, theta8):
     u = np.random.uniform(0,1)
-    ans = CDF_inv_L(u, x0, k1, theta8, theta9)
+    ans = CDF_inv_L(u, x0, k1, theta7, theta8)
     return ans
 
 """
