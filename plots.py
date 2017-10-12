@@ -292,7 +292,7 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 				for i in range(0, num_samples):
 					IMI_samples.append(fl.sample_L(x0, k1, theta7, theta8))
 
-				indiv_predicts.append(1.5*np.mean(IMI_samples))
+				indiv_predicts.append(np.mean(IMI_samples))
 
 		## Plot the results
 		#axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'], alpha=0.1)

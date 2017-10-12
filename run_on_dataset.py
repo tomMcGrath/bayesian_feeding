@@ -55,7 +55,7 @@ k1 = 0.00055
 ## Model setup
 with pm.Model() as model:
     ## Group mean
-    means = [-2, -2, -3, 1, 1, -2, 3, 3] # from unpooled data, all vars
+    means = [-2, -2, -3, 1, 1, 0, 2, 2] # from unpooled data, all vars
     num_vars = len(means)
     cov = np.eye(num_vars)
 
@@ -64,7 +64,7 @@ with pm.Model() as model:
     theta_holder = []
 
     ## Create covariance matrix from LKJ
-    sd_dist = pm.HalfNormal.dist(sd=3, shape=num_vars)
+    sd_dist = pm.HalfNormal.dist(sd=1, shape=num_vars)
     packed_chol = pm.LKJCholeskyCov('chol_cov', eta=1, n=num_vars, sd_dist=sd_dist)
     chol = pm.expand_packed_triangular(num_vars, packed_chol, lower=True)
 
@@ -102,7 +102,7 @@ with pm.Model() as model:
     rates = pm.Normal('rate', p10_theta2, sd=p10_theta3, observed=data[2,:])
 
     ## Pause likelihood
-    pauses = ll.pause_ll('pause', theta4, theta5, p10_theta6, p10_theta7, p10_theta8, k1, observed=data)
+    pauses = ll.pause_ll_new('pause', theta4, theta5, p10_theta6, p10_theta7, p10_theta8, k1, observed=data)
 
     ## Checking out different step methods to see which works
     # NUTS w/o ADVI - currently fails on LKJCholeskyCov
@@ -113,7 +113,7 @@ with pm.Model() as model:
                       step=pm.NUTS(), 
                       target_accept=0.7, 
                       max_treedepth=10,
-                      init='ADVI')
+                      init='NUTS')
     
     #trace = pm.sample(num_samples)
 

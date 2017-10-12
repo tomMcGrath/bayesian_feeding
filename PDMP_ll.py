@@ -95,8 +95,8 @@ class pause_ll_new(pm.distributions.Continuous):
 		self.theta4 = theta4
 		self.theta5 = theta5
 		self.theta6 = theta6
-		self.theta7 = 10*theta7
-		self.theta8 = 10*theta8
+		self.theta7 = theta7
+		self.theta8 = theta8
 		self.k1 = k1
 		super(pause_ll_new, self).__init__()
 		
@@ -138,40 +138,42 @@ class pause_ll_new(pm.distributions.Continuous):
 		"""
 		Long pause ll
 		"""
+		x0 = g_ends
+		t = p_lengths
+		
 		## Full emptying time
-		t_cs = 2.*tt.sqrt(g_ends)/k1
+		t_cs = 2.*tt.sqrt(x0)/k1
 
 		## Stomach fullness
-		t = p_lengths
-		x0 = g_ends
 		x = 0.25*tt.sqr(k1*t) - k1*t*tt.sqrt(x0) + x0
 
 		## ll if time is less than full emptying
-		g_pausing_1 = 0.25*tt.sqr(k1*p_lengths) - tt.sqrt(g_ends)*k1*p_lengths + g_ends
+		a_part1 = k1*t*theta8*tt.pow(theta7, 2)*(0.5*theta7 + theta8*(0.25*k1*t*tt.sqrt(x0) - 0.5*x0))
+		a_part2_1 = theta7*(tt.pow(theta7, 2) + theta7*theta8*(x + x0) + x0*tt.pow(theta8, 2)*x)
+		a_part2_2 = tt.sqrt(theta7*theta8)*(tt.arctan((0.5*k1*t - tt.sqrt(x0))*tt.sqrt(theta8/theta7)) + tt.arctan(tt.sqrt(theta8*x0/theta7)))
 
-		phi_L_1 = 1./tt.sqr(theta7 + theta8*g_pausing_1)
+		a_denom = k1*tt.pow(theta7, 3)*theta8*(theta7 + x0*theta8)*(theta7 + theta8*x)
+		a_psi = (a_part1 + a_part2_1*a_part2_2)/a_denom
 
-		psi_L_1 = theta7*(tt.pow(theta7, 2) + theta7*theta8*(x + x0) + x0*tt.pow(theta8, 2)*x)
-		psi_L_1 = psi_L_1 * tt.sqrt(theta7*theta8)*(tt.arctan((0.5*k1*t - tt.sqrt(x0))*tt.sqrt(theta8/theta7)) + tt.arctan(tt.sqrt(theta8*x0/theta7)))
-		psi_L_1 = psi_L_1 + k1*t*theta8*tt.pow(theta7, 2)*(0.5*theta7 + theta8*(0.25*k1*t*tt.sqrt(x0) - 0.5*x0))
-		psi_L_1 = psi_L_1 / k1*tt.pow(theta7, 3)*theta8*(theta7 + x0*theta8)*(theta7 + theta8*x)
+		a_phi = 1./(tt.sqr(theta7 + theta8*x))
 
-		ll_L_1 = tt.log(phi_L_1) - psi_L_1
+		ll_L_1 = tt.log(a_phi) - a_psi
 
 		## ll if time exceeds full emptying
-		phi_L_2 = 1./tt.sqr(theta7)
+		b_phi = 1./tt.sqr(theta7)
 
-		psi_L_2 = theta7*(tt.pow(theta7, 2) + theta7*theta8*(x + x0) + x0*tt.pow(theta8, 2)*x)
-		psi_L_2 = psi_L_2 * tt.sqrt(theta7*theta8)*(tt.arctan((0.5*k1*t_cs - tt.sqrt(x0))*tt.sqrt(theta8/theta7)) + tt.arctan(tt.sqrt(theta8*x0/theta7)))
-		psi_L_2 = psi_L_2 + k1*t_cs*theta8*tt.pow(theta7, 2)*(0.5*theta7 + theta8*(0.25*k1*t_cs*tt.sqrt(x0) - 0.5*x0))
-		psi_L_2 = psi_L_2 / k1*tt.pow(theta7, 3)*theta8*(theta7 + x0*theta8)*(theta7 + theta8*x)
+		b_part1 = k1*t_cs*theta8*tt.pow(theta7, 2)*(0.5*theta7 + theta8*(0.25*k1*t_cs*tt.sqrt(x0) - 0.5*x0))
+		b_part2_1 = theta7*(tt.pow(theta7, 2) + theta7*theta8*(x0))
+		b_part2_2 = tt.sqrt(theta7*theta8)*(tt.arctan((0.5*k1*t_cs - tt.sqrt(x0))*tt.sqrt(theta8/theta7)) + tt.arctan(tt.sqrt(theta8*x0/theta7)))
 
-		psi_L_2 = psi_L_2 + (p_lengths-t_cs)/tt.sqr(theta7)
+		b_denom = k1*tt.pow(theta7, 3)*theta8*(theta7 + x0*theta8)*(theta7)
+		b_psi = (b_part1 + b_part2_1*b_part2_2)/b_denom
+		b_psi = b_psi + (t-t_cs)/tt.sqr(theta7)
 
-		ll_L_2 = tt.log(phi_L_2) - psi_L_2
+		ll_L_2 = tt.log(b_phi) - b_psi
 
 		## Switch based on t_c
-		ll_L = tt.switch(tt.lt(p_lengths, t_cs), ll_L_1, ll_L_2)
+		ll_L = tt.switch(tt.lt(t, t_cs), ll_L_1, ll_L_2)
 
 		## Avoid numerical issues in logaddexp
 		
