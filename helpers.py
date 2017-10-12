@@ -84,10 +84,11 @@ def clean_data(data, amt_max, dur_max, rate_max, dur_min):
     outlier_count, data = remove_outliers(data, amt_max, dur_max, rate_max, dur_min)
     return data, cancel_count, neg_count, outlier_count
 
-def filter_data(df, cage_id, start, stop):
+def filter_data(df, cage_id, start, stop, max_cutoff):
     after_start = df[df['start_ts'] >= start].index
     correct_cage = df[df['cage_id'] == cage_id].index
     before_stop = df[df['end_ts'] <= stop].index
+    within_cutoff = df[df['start_ts'] <= max_cutoff].index
     
     full_index = after_start.intersection(correct_cage).intersection(before_stop)
     
@@ -96,6 +97,7 @@ def filter_data(df, cage_id, start, stop):
     
     next_after = pd.Index([full_index[-1] + 1])
     full_index = full_index.union(next_after)
+    full_index = full_index.intersection(within_cutoff)
     full_index = full_index.intersection(correct_cage)
     
     return full_index
