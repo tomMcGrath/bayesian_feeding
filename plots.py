@@ -181,7 +181,7 @@ def plot_ethogram(folder, num_animals, maxlen=None, downsample=10, ysize=50):
 """
 Figure 2
 """
-def pairplot(df, var1, var2, ctype='drug_c'):
+def pairplot(df, var1, var2, ctype='drug_c', transforms=[None, None]):
 	fig, axes = plt.subplots(1, figsize=(10,10))
 
 	def plot_pairs(row):
@@ -189,6 +189,24 @@ def pairplot(df, var1, var2, ctype='drug_c'):
 		y = row[var2]
 		c = row[ctype]
 		ms = row['ms']
+
+		if transforms[0] == '-1':
+			x = -1*x
+
+		if transforms[1] == '-1':
+			y = -1*y
+
+		if transforms[0] == 'pow10':
+			x = np.power(10., x)
+
+		if transforms[1] == 'pow10':
+			y = np.power(10., y)
+
+		if transforms[0] == 'pow10_inv':
+			x = np.power(10., -x)
+
+		if transforms[1] == 'pow10_inv':
+			y = np.power(10., -y)
 
 		axes.scatter(x, y, c=c, marker=ms)
 
