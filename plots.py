@@ -214,33 +214,57 @@ def pairplot(df, var1, var2, ctype='drug_c', transforms=[None, None]):
 
 	return fig, axes
 
-def trellisplot(df, varlist):
+def trellisplot(df, varlist, transforms):
 	## Prepare the figure
 	num_vars = len(varlist)
 	fig, axes = plt.subplots(num_vars, num_vars, figsize=(10,10))
 
 	## Plot the data
 	for i, var1 in enumerate(varlist):
+		dataset1 = df[var1]
+		transform1 = transforms[i]
+		if transform1 == 'pow10_inv':
+			dataset1 = np.power(10., -dataset1)
+
 		for j, var2 in enumerate(varlist):
+			dataset2 = df[var2]
+			transform2 = transforms[j]
+			if transform2 == 'pow10_inv':
+				dataset2 = np.power(10., -dataset2)
 
 			## Data on the lower diagonal
-			if i >= j:
+			if i > j:
 				continue
-			else:
-				axes[j, i].scatter(df[var1], df[var2], alpha=0.6)
 
 			## KDE/histogram on the diagonal
+			elif i == j:
+				axes[i,i].hist(dataset1, bins=20)
+
+			else:
+				axes[j, i].scatter(dataset1, dataset2, alpha=0.6)
+
+
 
 	## Do regression - could bootstrap
 	for i, var1 in enumerate(varlist):
+		dataset1 = df[var1]
+		transform1 = transforms[i]
+		if transform1 == 'pow10_inv':
+			dataset1 = np.power(10., -dataset1)
+
 		for j, var2 in enumerate(varlist):
+			dataset2 = df[var2]
+			transform2 = transforms[j]
+			if transform2 == 'pow10_inv':
+				dataset2 = np.power(10., -dataset2)
+
 			if i >= j:
 				continue
 
 			else:
 				## Do the regression
-				x = np.array(df[var1]).astype(float)
-				y = np.array(df[var2]).astype(float)
+				x = dataset1
+				y = dataset2
 				slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
 
 				axes[j, i].plot(x, intercept + x*slope, c='k')
@@ -249,20 +273,28 @@ def trellisplot(df, varlist):
 
 	return fig, axes
 
-def univariate_posterior(data_dict, idx, numbins=50):
+def univariate_posterior(data_dict, idx, groups_to_use, numbins=50, transform=None):
 	fig, axes = plt.subplots(2, 1, figsize=(10,10))
 
 	for key in data_dict.keys():
+		if key not in groups_to_use:
+			continue
+
 		dataset = data_dict[key][:, idx]
 		data = key.split('_')[:-1]
 		c = helpers.get_colour(data)
-		print data
+
+		if transform == 'pow10':
+			dataset = np.power(10., dataset)
+
+		if transform == 'pow10_inv':
+			dataset = np.power(10., -dataset)
 
 		if data[3] == 'D':
-			axes[0].hist(dataset, bins=numbins, color=c, histtype='step')
+			axes[0].hist(dataset, bins=numbins, color=c, histtype='stepfilled', alpha=0.6, normed=True)
 
 		else:
-			axes[1].hist(dataset, bins=numbins, color=c, histtype='step')
+			axes[1].hist(dataset, bins=numbins, color=c, histtype='stepfilled', alpha=0.6, normed=True)
 
 
 	return fig, axes
