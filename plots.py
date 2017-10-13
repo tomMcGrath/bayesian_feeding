@@ -618,8 +618,7 @@ def fullness_IMI(df, cutoff=300, exp_param=1.5):
 
 	return fig, axes
 
-def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10):
-    windowsize = 5
+def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10, windowsize=2):
     err_thresh = 20000
     
     p_lengths = []
@@ -662,7 +661,7 @@ def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10):
     means = np.array(means)
 
     ## Plot moving window
-    fig, axes = plt.subplots(1)
+    fig, axes = plt.subplots(1, figsize=(10,10))
     axes.scatter(results[:,0], 
                  results[:,1], 
                  alpha=0.3, 
@@ -695,8 +694,89 @@ def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10):
         
     axes.plot(sample_x_grid, mean_ppcs, c='r')
     axes.fill_between(sample_x_grid, ppcs_low, ppcs_high, color='r', alpha=0.3)
+
+    return fig, axes
+
+def plot_satiety_ratio(data_dir, cutoff=300, windowsize=2):
+    p_lengths = []
+    mealsizes = []
+    c = []
+    err_thresh = 20000
+    ratios = []
+
+    ## Assemble dataset
+    count = len(os.listdir(data_dir))
+    for i, dataset in enumerate(os.listdir(data_dir)):
+        data = np.loadtxt(data_dir+dataset, delimiter='\t', usecols=(0,1,2,3,4))
+
+        mealnum = 0
+        mealsize = 0
+        for j in data:
+            
+            f_length, g_start, rate, p_length, g_end = j
+            mealsize += 3.5*rate*f_length
+            
+            if p_length > cutoff and p_length < err_thresh:
+                p_lengths.append(p_length)
+                mealsizes.append(mealsize)
+
+                if mealnum == 0:
+                	ratios.append(float(p_length)/mealsize)
+                	
+                mealsize = 0
+                c.append(float(i)/count)
+
+
+                mealnum += 1
+
+            if p_length > err_thresh:
+                print 'Error in %s, IMI of %3.0f' %(dataset, p_length)
+
+    ## Process to use in moving window
+    results = zip(mealsizes, p_lengths)
+    results = np.array(results)
+
+    ## Generate moving window mean
+    x_grid = np.linspace(0, max(mealsizes), 50)
+
+    means = []
+    for xval in x_grid:
+        usevals = np.abs(results[:,0] - xval) < windowsize
+        meanval = np.mean(results[usevals, 1])
+        means.append(meanval)
+        
+    means = np.array(means)
+
+    ## Plot moving window
+    fig, axes = plt.subplots(1, figsize=(10,10))
+    axes.scatter(results[:,0], 
+                 results[:,1], 
+                 alpha=0.3, 
+                 c='b', 
+                 cmap=cm.gist_ncar)
     
-    plt.show()
+    axes.plot(x_grid, means, c='k')
+    
+    ## Calculate satiety ratio
+    """
+    srs = []
+    for i in results:
+        ratio = float(i[1])/i[0]
+        print ratio
+        srs.append(ratio)
+    satiety_ratio = np.mean(srs)
+    """
+    #satiety_ratio = np.mean(results, axis=0)[1]/np.mean(results, axis=0)[0]
+    #satiety_ratio = float(results[0][1])/results[0][0]
+    satiety_ratio = np.mean(ratios)
+    print satiety_ratio
+
+    
+    ratio_predict = x_grid*satiety_ratio
+    axes.plot(x_grid, ratio_predict, c='r')
+    
+    return fig, axes
+    
 
 
 """
@@ -838,7 +918,7 @@ def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default
 	return fig, axes, ranked_protocols
 
 def behav_change_effect_group(data_dict, groupname, xmax, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(2, 1, figsize=(10,10))
 
 	post = data_dict[groupname]
 	post = np.mean(post, axis=0)
@@ -849,8 +929,15 @@ def behav_change_effect_group(data_dict, groupname, xmax, num_samples=100, durat
 		baseline_samples.append(fs.sample(duration, post, 0)[1])
 		perturbed_samples.append(fs.sample_lim_x(duration, post, 0, xmax)[1])
 
-	axes.hist(baseline_samples, color='b', bins=20, normed=True)
-	axes.hist(perturbed_samples, color='r', bins=20, normed=True)
+	baseline_ts = fs.sample(duration, post, 0)[0]
+	perturbed_ts = fs.sample_lim_x(duration, post, 0, xmax)[0]
+
+	axes[0].plot(baseline_ts[:duration], c='b')
+	axes[0].plot(perturbed_ts[:duration], c='r')
+	axes[0].axhline(xmax, c='k', ls='--')
+
+	axes[1].hist(baseline_samples, color='b', bins=20, normed=True)
+	axes[1].hist(perturbed_samples, color='r', bins=20, normed=True)
 
 	return fig, axes
 
