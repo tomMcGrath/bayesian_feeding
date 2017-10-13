@@ -283,7 +283,8 @@ def get_colour(data):
         c = 'k'
 
     elif drug == 'Lep':
-        c = cm.tab20c(0) # red
+        #c = cm.tab20c(0) # red
+        c = 'r'
 
     elif drug == 'saline': # graded blue
         if recover == 'A':

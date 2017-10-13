@@ -31,12 +31,8 @@ def compare_sample(df, data_dict, varlist, idx):
 """
 Figure 1
 """
-def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=60*60):
+def ts_from_data(data):
 	k1 = 0.00055
-	theta7 = np.power(10., thetas[6])
-	theta8 = np.power(10., thetas[7])
-	fig, axes = plt.subplots(2,1, figsize=(10,10))
-
 	bout_ts_holder = [[0]]
 	stomach_ts_holder = [[0]]
 
@@ -71,6 +67,16 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	bout_ts = np.hstack(bout_ts_holder)
 	stomach_ts = np.hstack(stomach_ts_holder)
 
+	return bout_ts, stomach_ts
+
+def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=60*60):
+	k1 = 0.00055
+	theta7 = np.power(10., thetas[6])
+	theta8 = np.power(10., thetas[7])
+	fig, axes = plt.subplots(2,1, figsize=(10,10))
+
+	bout_ts, stomach_ts = ts_from_data(data)
+
 	## Plot the time series
 	axes[0].plot(bout_ts)
 	axes[1].plot(stomach_ts)
@@ -97,16 +103,18 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	ax2 = axes[0].twinx()
 
 	## Histogram of results
-	#ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
+	ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
 
 	## KDE of results
+	"""
 	x_grid = np.arange(len(stomach_ts))
-	kde = scipy.stats.gaussian_kde(next_times)
+	kde = scipy.stats.gaussian_kde(next_times, bw_method='silverman')
 	y = kde.evaluate(x_grid)
-	ax2.plot(x_grid, y, c='r')
-	ax2.fill_between(x_grid, 0, y, color='r', alpha=0.3)
+	ax2.plot(x_grid[int(start_time):], y[int(start_time):], c='r')
+	ax2.fill_between(x_grid[int(start_time):], 0, y[int(start_time):], color='r', alpha=0.3)
 	ax2.set_ylim([0, 2.5*np.max(y)])
-
+	ax2.set_yticklabels([])
+	"""
 	## Predict samples of stomach fullness
 	ts_predictions = []
 	i = 0
@@ -128,7 +136,47 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	max_val = np.percentile(ts_predictions, 100-pc, axis=0)
 	axes[1].fill_between(x, min_val, max_val, alpha=0.3, color='r')
 
+	plt.subplots_adjust(hspace=0.1)
+
 	return fig, axes
+
+def plot_ethogram(folder, num_animals, maxlen=None, downsample=10, ysize=50):
+	num_animals = min(num_animals, len(os.listdir(folder)))
+
+	fig, axes = plt.subplots(2*num_animals, 1, figsize=(10,10))
+
+	for i, filename in enumerate(os.listdir(folder)):
+		if i >= num_animals:
+			continue
+
+		filepath = folder + '/' + filename
+		data = np.loadtxt(filepath, delimiter='\t', usecols=(0,1,2,3,4))
+		bout_ts, stomach_ts = ts_from_data(data)
+
+		## Set the feeding to binary and downsample
+		bout_ts = bout_ts[:maxlen] > 0.0
+		bout_ts = bout_ts[::downsample]
+
+		## Downsample the stomach fullness
+		stomach_ts = stomach_ts[:maxlen]
+		stomach_ts = stomach_ts[::downsample]
+
+		## Make rasterplot of bouts
+		x = np.outer(np.ones(ysize), bout_ts)
+		axes[2*i].matshow(x, cmap=cm.Greys)
+		## Plot stomach fullness
+		y = np.outer(np.ones(ysize), stomach_ts)
+		axes[2*i + 1].matshow(y, cmap=cm.YlOrRd)
+
+	for i in range(2*num_animals):
+		axes[i].set_xticklabels([])
+		axes[i].set_yticklabels([])
+		axes[i].set_yticks([])
+
+	#fig.tight_layout(pad=0.1, w_pad=0.1, h_pad=0.001)
+	plt.subplots_adjust(hspace=0.05)
+	return fig, axes
+
 
 """
 Figure 2
@@ -266,7 +314,7 @@ def IMI_fullness(df, cutoff=300):
 	return fig, axes
 
 def IMI_prediction(df, num_samples=10, cutoff=300):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(3, 1, figsize=(10,10))
 	k1 = 0.00055
 
 	def predict_IMI(row):
@@ -280,8 +328,9 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 		## Iterate through the bouts, getting x0 and IMI once pause length exceeds cutoff
 		true_IMIs = []
 		indiv_predicts = [] # predictions based on individual posterior means
-
-		for event in data:
+		residuals = []
+		next_sizes = []
+		for i, event in enumerate(data):
 			f_length, g_start, rate, p_length, g_end_feeding = event
 
 			IMI_samples = []
@@ -289,31 +338,43 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 				x0 = g_end_feeding
 				true_IMIs.append(p_length)
 
-				for i in range(0, num_samples):
+				for j in range(0, num_samples):
 					IMI_samples.append(fl.sample_L(x0, k1, theta7, theta8))
 
-				indiv_predicts.append(np.mean(IMI_samples))
+				mean_predict = np.mean(IMI_samples)
+				indiv_predicts.append(mean_predict)
+				resid = p_length - mean_predict
+				residuals.append(resid)
+
+				if i < len(data)-1:
+					next_size = 3.5*data[i+1][0]*data[i+1][2]
+					next_sizes.append(next_size)
 
 		## Plot the results
 		#axes.scatter(true_IMIs, indiv_predicts, c=row['drug_c'], alpha=0.1)
 		#axes.scatter(true_IMIs, indiv_predicts, c=row['rate_c'], alpha=0.1)
-		axes.scatter(true_IMIs, indiv_predicts, c='b', alpha=0.1)
+		axes[0].scatter(true_IMIs, indiv_predicts, c='b', alpha=0.1)
+		axes[1].scatter(true_IMIs, residuals, c='b', alpha=0.1)
+		axes[2].scatter(residuals[:len(next_sizes)], next_sizes, c='b', alpha=0.025)
 
 	## Iterate over the dataset
 	df.apply(predict_IMI, axis=1)
 
 	## Axes labels etc
-	axes.set_xlabel('True IMI')
-	axes.set_ylabel('Predicted IMI')
+	axes[0].set_xlabel('True IMI')
+	axes[0].set_ylabel('Predicted IMI')
 
-	axes.set_xlim([0, 20000])
-	axes.set_ylim([0, 20000])
+	#axes.set_xlim([0, 20000])
+	#axes.set_ylim([0, 20000])
 
-	x = np.linspace(cutoff, 60000, 10)
-	axes.plot(x, x, c='k', ls='--')
+	## Visual guides
+	x = np.linspace(cutoff, 8*3600, 10)
+	axes[0].plot(x, x, c='k', ls='--')
+	axes[1].axhline(0, c='k', ls='--')
 
-	#axes.set_xscale('log')
-	#axes.set_yscale('log')
+	axes[0].set_xscale('log')
+	axes[0].set_yscale('log')
+	axes[1].set_xscale('log')
 
 	return fig, axes
 
@@ -368,11 +429,14 @@ def predict_IMI_full_post(df, data_dict, num_resamples=1, cutoff=300):
 	axes.set_xlabel('True IMI')
 	axes.set_ylabel('Predicted IMI')
 
-	axes.set_xlim([0, 20000])
-	axes.set_ylim([0, 20000])
+	#axes.set_xlim([0, 20000])
+	#axes.set_ylim([0, 20000])
 
-	x = np.linspace(0, 60000, 10)
+	x = np.linspace(cutoff, 8*3600, 10)
 	axes.plot(x, x, c='k', ls='--')
+
+	axes.set_xscale('log')
+	axes.set_yscale('log')
 
 	return fig, axes
 
@@ -426,7 +490,7 @@ def IMI_prediction_KDEmax(df, num_samples=10, cutoff=300):
 	#axes.set_xlim([0, 5000])
 	#axes.set_ylim([0, 5000])
 
-	x = np.linspace(cutoff, 60000, 10)
+	x = np.linspace(cutoff, 8*3600, 10)
 	axes.plot(x, x, c='k', ls='--')
 
 	axes.set_xscale('log')
@@ -471,6 +535,119 @@ def intake_fullness(df, cutoff=300):
 
 
 	return fig, axes
+
+def fullness_IMI(df, cutoff=300, exp_param=1.5):
+	fig, axes = plt.subplots(2, 1, figsize=(10,10))
+
+	p_lengths = []
+	def plot_data(row):
+		## Import the meal data for this animal
+		data = helpers.data_from_row(row)
+
+		for event in data:
+			f_length, g_start, rate, p_length, g_end_feeding = event
+			
+			#p_lengths.append(np.log10(p_length))
+			if p_length < cutoff:
+				p_lengths.append(p_length)
+
+			axes[0].scatter(g_end_feeding, p_length, c='b', alpha=0.1)
+
+	df.apply(plot_data, axis=1)
+
+	lambd = np.power(10., exp_param)
+	samples = np.random.exponential(lambd, size=1000)
+	#samples = np.log10(samples)
+
+	axes[0].axhline(cutoff, c='k', ls='--')
+	axes[0].set_yscale('log')
+	axes[1].hist([samples, p_lengths], bins=10, normed=True, color=['b', 'r'])
+	#axes[1].hist(p_lengths, bins=20, normed=True)
+	#axes[1].axvline(np.log10(cutoff), c='k', ls='--')
+	axes[1].axvline(cutoff, c='k', ls='--')
+
+	return fig, axes
+
+def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10):
+    windowsize = 5
+    err_thresh = 20000
+    
+    p_lengths = []
+    g_ends = []
+    c = []
+
+    ## Assemble dataset
+    count = len(os.listdir(data_dir))
+    for i, dataset in enumerate(os.listdir(data_dir)):
+        data = np.loadtxt(data_dir+dataset, delimiter='\t', usecols=(0,1,2,3,4))
+
+        for j in data:
+            f_lengths, g_starts, rates, p_length, g_end = j
+
+            if p_length > cutoff and p_length < err_thresh:
+                p_lengths.append(p_length)
+                g_ends.append(g_end)
+                c.append(float(i)/count)
+
+            if p_length > err_thresh:
+                print 'Error in %s, IMI of %3.0f' %(dataset, p_length)
+
+    ## Process to use in moving window
+    results = zip(g_ends, p_lengths)
+    results = np.array(results)
+
+    ## Generate moving window mean
+    x_grid = np.linspace(0, np.max(results[:,0]), 100)
+
+    means = []
+    for xval in x_grid:
+        usevals = np.abs(results[:,0] - xval) < windowsize
+        meanval = np.mean(results[usevals, 1])
+        means.append(meanval)
+
+    """
+    for i in results:
+        print '%3.3f\t%3.3f' %(i[0], i[1])
+    """
+    means = np.array(means)
+
+    ## Plot moving window
+    fig, axes = plt.subplots(1)
+    axes.scatter(results[:,0], 
+                 results[:,1], 
+                 alpha=0.3, 
+                 c='b', # use c=c to get individual colour coding
+                 cmap=cm.gist_ncar)
+    
+    axes.plot(x_grid, means, c='k')
+    
+    ## Generate posterior predictive curve
+    post = data_dict[data_dir.split('/')[1]+'_trace.p']
+    post = np.mean(post, axis=0)
+    
+    mean_ppcs = []
+    ppcs_low = []
+    ppcs_high = []
+    k1 = 0.00055
+    sample_x_grid = np.linspace(0, np.max(results[:,0]), 30)
+    for xval in sample_x_grid:
+        samples = []
+        for i in range(num_samples):
+            theta7 = np.power(10., post[6])
+            theta8 = np.power(10., post[7])
+            samples.append(fl.sample_L(xval, k1, theta7, theta8))
+            
+        mean_ppcs.append(np.mean(samples))
+        ppc_low = np.percentile(samples, 5)
+        ppc_high = np.percentile(samples, 95)
+        ppcs_low.append(ppc_low)
+        ppcs_high.append(ppc_high)
+        
+    axes.plot(sample_x_grid, mean_ppcs, c='r')
+    axes.fill_between(sample_x_grid, ppcs_low, ppcs_high, color='r', alpha=0.3)
+    
+    plt.show()
+
 
 """
 Figure 4
