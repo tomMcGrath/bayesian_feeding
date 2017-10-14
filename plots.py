@@ -793,12 +793,24 @@ def termination_prob(data_dict):
 		data = key.split('_')[:-1]
 		c = helpers.get_colour(data)
 
-
 		sig_min, sig_mean, sig_max, sig_int = helpers.get_Q(x_vals, theta4, theta5)
 
 		axes.plot(x_vals, sig_mean, c=c)
 
 	return fig, axes
+
+def termination_given_params(theta4, theta5):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	x_vals = np.linspace(0, 30, 1000)
+	y = []
+	for x in x_vals:
+		y.append(fl.Q(x, theta4, theta5))
+
+	axes.plot(x_vals, y)
+	#axes.fill_between(x_vals, sig_min, sig_max, alpha=0.3)
+	return fig, axes
+
 
 def param_change_effect(data_dict, indiv, param_idx, delta, num_samples=100, duration=8*60*60):
 	fig, axes = plt.subplots(1, figsize=(10,10))
@@ -811,13 +823,163 @@ def param_change_effect(data_dict, indiv, param_idx, delta, num_samples=100, dur
 	baseline_samples = []
 	perturbed_samples = []
 	for i in range(num_samples):
-		baseline_samples.append(fs.sample(duration, post, 0)[1])
-		perturbed_samples.append(fs.sample(duration, perturbed_params, 0)[1])
+		baseline_samples.append(3600*fs.sample(duration, post, 0)[1]/duration)
+		perturbed_samples.append(3600*fs.sample(duration, perturbed_params, 0)[1]/duration)
 
-	axes.hist(baseline_samples, color='b', bins=20)
-	axes.hist(perturbed_samples, color='r', bins=20)
+	axes.hist(baseline_samples, color='b', bins=20, normed=True, alpha=0.6)
+	axes.hist(perturbed_samples, color='r', bins=20, normed=True, alpha=0.6)
 
 	return fig, axes
+
+def pairwise_param_changes(data_dict, indiv, delta=0.1, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(1, figsize=(10,10))
+
+	post = data_dict[indiv]
+	post = np.mean(post, axis=0)
+
+	num_vars = len(post)
+	delta_mat = np.zeros((num_vars, num_vars))
+
+	for i in range(num_vars):
+		for j in range(num_vars):
+			perturbed_params = np.copy(post)
+			perturbed_params[i] = perturbed_params[i] + delta
+			perturbed_params[j] = perturbed_params[j] + delta
+
+			samples = []
+			for k in range(num_samples):
+				samples.append(fs.sample(duration, perturbed_params, 0)[1])
+
+			delta_mat[i,j] = np.mean(samples)
+
+	axes.matshow(delta_mat)
+
+	return fig, axes
+
+
+def meals_from_data(data, cutoff=300):
+    mealnum = 0
+    mealsize = 0
+    mealdur = 0
+
+    mealsizes = []
+    mealdurs = []
+    p_lengths = []
+    for event in data:
+        
+        f_length, g_start, rate, p_length, g_end = event
+        mealsize += 3.5*rate*f_length
+        mealdur += f_length
+        
+        if p_length > cutoff:
+            p_lengths.append(p_length)
+
+            mealsizes.append(mealsize)
+            mealsize = 0
+
+            mealdurs.append(mealdur)
+            mealdur = 0
+
+            mealnum += 1
+
+    return mealsizes, mealdurs, p_lengths
+
+
+def param_delta_curve(data_dict, indivs, param_idx, delta_range, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(5, 1, figsize=(10,10))
+
+	for indiv in indivs:
+		post = data_dict[indiv]
+		post = np.mean(post, axis=0)
+		data = indiv.split('_')
+		c = helpers.get_colour(data[:4])
+
+		y1 = []
+		y1_min = []
+		y1_max = []
+
+		y2 = []
+		y2_min = []
+		y2_max = []
+
+		y3 = []
+		y3_min = []
+		y3_max = []
+
+		y4 = []
+		y4_min = []
+		y4_max = []
+
+		y5 = []
+		y5_min = []
+		y5_max = []
+
+		for delta in delta_range:
+			perturbed_params = np.copy(post)
+			perturbed_params[param_idx] = perturbed_params[param_idx] + delta
+
+			sample_amts = []
+			sample_sizes = []
+			sample_durs = []
+			sample_IMIs = []
+			meal_counts = []
+			for i in range(num_samples):
+				sample_data = fs.sample(duration, perturbed_params, 0)
+				sample_amount = sample_data[1]
+				events = sample_data[-1]
+				sample_amts.append(3600*sample_amount/duration)
+
+				mealsizes, mealdurs, p_lengths = meals_from_data(events)
+
+				sample_sizes += mealsizes
+				sample_durs += mealdurs
+				sample_IMIs += p_lengths
+				meal_counts.append(len(p_lengths))
+
+			## Normalised feeding amount distribution
+			y1.append(np.mean(sample_amts))
+			#y1_min.append(np.percentile(sample_amts, 5))
+			#y1_max.append(np.percentile(sample_amts, 95))
+
+			## Meal size
+			y2.append(np.mean(sample_sizes))
+			#y2_min.append(np.percentile(sample_sizes, 5))
+			#y2_max.append(np.percentile(sample_sizes, 95))
+
+			## Meal duration
+			y3.append(np.mean(sample_durs))
+			#y3_min.append(np.percentile(sample_durs, 5))
+			#y3_max.append(np.percentile(sample_durs, 95))
+
+			## Intermeal interval
+			y4.append(np.mean(sample_IMIs))
+			#y4_min.append(np.percentile(sample_IMIs, 5))
+			#y4_max.append(np.percentile(sample_IMIs, 95))			
+
+			## Meal count
+			#print meal_counts	
+			y5.append(np.mean(meal_counts))
+			#y5_min.append(np.percentile(meal_counts, 5))
+			#y5_max.append(np.percentile(meal_counts, 95))	
+
+		axes[0].plot(delta_range, y1, c=c)
+		#axes[0].fill_between(delta_range, y1_min, y1_max, alpha=0.1, color=c)
+
+		axes[1].plot(delta_range, y2, c=c)
+		#axes[1].fill_between(delta_range, y2_min, y2_max, alpha=0.1, color=c)
+
+		axes[2].plot(delta_range, y3, c=c)
+		#axes[2].fill_between(delta_range, y3_min, y3_max, alpha=0.1, color=c)
+
+		axes[3].plot(delta_range, y4, c=c)
+		#axes[3].fill_between(delta_range, y4_min, y4_max, alpha=0.1, color=c)
+
+		axes[4].plot(delta_range, y5, c=c)
+		#axes[4].fill_between(delta_range, y5_min, y5_max, alpha=0.1, color=c)
+
+	return fig, axes
+
+
 
 """
 Figure 5
