@@ -988,14 +988,14 @@ def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
 	fig, axes = plt.subplots(1, figsize=(10,10))
 
 	## Do the sampling
-	amounts, all_ts, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff)
+	amounts, ts_mean, ts_pc, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff)
 
 	## Plot mean time series and bounds
-	xax = np.arange(all_ts.shape[1])
-	axes.plot(np.mean(all_ts, axis=0), c='r')
+	xax = np.arange(len(ts_mean))
+	axes.plot(ts_mean, c='r')
 	axes.fill_between(xax,
-					  np.percentile(all_ts, 2.5, axis=0), 
-					  np.percentile(all_ts, 97.5, axis=0),
+					  ts_pc[0], 
+					  ts_pc[1],
 					  color='r',
 					  alpha=0.3)
 
@@ -1074,8 +1074,8 @@ def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default
 	ranked_protocols = sorted(protocols_to_rank, key=lambda x:x[0])
 	opt_protocol = ranked_protocols[0]
 	pess_protocol = ranked_protocols[-1]
-	axes[2].hist(opt_protocol[1], color='b', bins=20, normed=True)
-	axes[2].hist(pess_protocol[1], color='r', bins=20, normed=True)
+	axes[2].hist(opt_protocol[1], color='b', bins=20, normed=True, alpha=0.6)
+	axes[2].hist(pess_protocol[1], color='r', bins=20, normed=True, alpha=0.6)
 
 	return fig, axes, ranked_protocols
 
@@ -1125,5 +1125,96 @@ def behav_change_effect_indiv(df, xmax, thetas, num_samples=100, duration=8*60*6
 
 	## Iterate the plotter over the dataframe
 	df.apply(calc_change, axis=1)
+
+	return fig, axes
+
+def behav_response_curve(data_dict, indivs, delta_range, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(5, 1, figsize=(10,10))
+
+	for indiv in indivs:
+		post = data_dict[indiv]
+		post = np.mean(post, axis=0)
+		data = indiv.split('_')
+		c = helpers.get_colour(data[:4])
+
+		y1 = []
+		y1_min = []
+		y1_max = []
+
+		y2 = []
+		y2_min = []
+		y2_max = []
+
+		y3 = []
+		y3_min = []
+		y3_max = []
+
+		y4 = []
+		y4_min = []
+		y4_max = []
+
+		y5 = []
+		y5_min = []
+		y5_max = []
+
+		for delta in delta_range:
+			sample_amts = []
+			sample_sizes = []
+			sample_durs = []
+			sample_IMIs = []
+			meal_counts = []
+			for i in range(num_samples):
+				sample_data = fs.sample_lim_x(duration, post, 0, delta)
+				sample_amount = sample_data[1]
+				events = sample_data[-1]
+				sample_amts.append(3600*sample_amount/duration)
+
+				mealsizes, mealdurs, p_lengths = meals_from_data(events)
+
+				sample_sizes += mealsizes
+				sample_durs += mealdurs
+				sample_IMIs += p_lengths
+				meal_counts.append(len(p_lengths))
+
+			## Normalised feeding amount distribution
+			y1.append(np.mean(sample_amts))
+			#y1_min.append(np.percentile(sample_amts, 5))
+			#y1_max.append(np.percentile(sample_amts, 95))
+
+			## Meal size
+			y2.append(np.mean(sample_sizes))
+			#y2_min.append(np.percentile(sample_sizes, 5))
+			#y2_max.append(np.percentile(sample_sizes, 95))
+
+			## Meal duration
+			y3.append(np.mean(sample_durs))
+			#y3_min.append(np.percentile(sample_durs, 5))
+			#y3_max.append(np.percentile(sample_durs, 95))
+
+			## Intermeal interval
+			y4.append(np.mean(sample_IMIs))
+			#y4_min.append(np.percentile(sample_IMIs, 5))
+			#y4_max.append(np.percentile(sample_IMIs, 95))			
+
+			## Meal count
+			#print meal_counts	
+			y5.append(np.mean(meal_counts))
+			#y5_min.append(np.percentile(meal_counts, 5))
+			#y5_max.append(np.percentile(meal_counts, 95))	
+
+		axes[0].plot(delta_range, y1, c=c)
+		#axes[0].fill_between(delta_range, y1_min, y1_max, alpha=0.1, color=c)
+
+		axes[1].plot(delta_range, y2, c=c)
+		#axes[1].fill_between(delta_range, y2_min, y2_max, alpha=0.1, color=c)
+
+		axes[2].plot(delta_range, y3, c=c)
+		#axes[2].fill_between(delta_range, y3_min, y3_max, alpha=0.1, color=c)
+
+		axes[3].plot(delta_range, y4, c=c)
+		#axes[3].fill_between(delta_range, y4_min, y4_max, alpha=0.1, color=c)
+
+		axes[4].plot(delta_range, y5, c=c)
+		#axes[4].fill_between(delta_range, y5_min, y5_max, alpha=0.1, color=c)
 
 	return fig, axes
