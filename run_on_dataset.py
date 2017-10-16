@@ -102,7 +102,7 @@ with pm.Model() as model:
     rates = pm.Normal('rate', p10_theta2, sd=p10_theta3, observed=data[2,:])
 
     ## Pause likelihood
-    pauses = ll.pause_ll_new('pause', theta4, theta5, p10_theta6, p10_theta7, p10_theta8, k1, observed=data)
+    pauses = ll.pause_ll('pause', theta4, theta5, p10_theta6, p10_theta7, p10_theta8, k1, observed=data)
 
     ## Checking out different step methods to see which works
     # NUTS w/o ADVI - currently fails on LKJCholeskyCov

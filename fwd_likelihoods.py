@@ -18,6 +18,22 @@ def phi_F(t, x0, rate, theta1):
     ans = theta1
 
     return ans
+"""
+def phi_L_quad(t, x0, k1, theta7, theta8):
+    if x0 > 0.0:
+        t_c = 2.0*np.sqrt(x0)/k1 # time to hit zero
+    else:
+        t_c = 0.0
+
+    if t >= t_c:
+        x = 0.0
+    else:
+        x = 0.25*np.power((2.*np.sqrt(x0) - k1*t), 2)
+
+    ans = np.power(1./(theta7 + theta8*x), 2)
+
+    return ans
+"""
 
 def phi_L(t, x0, k1, theta7, theta8):
     if x0 > 0.0:
@@ -30,7 +46,7 @@ def phi_L(t, x0, k1, theta7, theta8):
     else:
         x = 0.25*np.power((2.*np.sqrt(x0) - k1*t), 2)
 
-    ans = np.power(1./(theta7 + theta8*x), 2)
+    ans = 1./(theta7 + theta8*x)
 
     return ans
 
@@ -56,6 +72,20 @@ def psi_L(t, x0, k1, theta7, theta8):
     return ans
 
 def L_an_int(t, x0, k1, theta7, theta8):
+    return 2.*np.arctan(0.5*np.sqrt(theta8/theta7)*(k1*t - 2.*np.sqrt(x0)))/(k1*np.sqrt(theta7*theta8))
+
+def psi_L_an(t, x0, k1, theta7, theta8):
+    t_c = 2.*np.sqrt(x0)/k1
+
+    if t <= t_c:
+        return L_an_int(t, x0, k1, theta7, theta8) - L_an_int(0, x0, k1, theta7, theta8)
+
+    else:
+
+        return psi_L_an(t_c, x0, k1, theta7, theta8) + (t - t_c)/theta7    
+
+"""
+def L_an_int(t, x0, k1, theta7, theta8):
     x = 0.25*np.power(k1*t, 2) - k1*t*np.sqrt(x0) + x0
 
     part1 = k1*t*theta8*np.power(theta7, 2)*(0.5*theta7 + theta8*(0.25*k1*t*np.sqrt(x0) - 0.5*x0))
@@ -75,7 +105,7 @@ def psi_L_an(t, x0, k1, theta7, theta8):
 
     else:
         return psi_L_an(t_c, x0, k1, theta7, theta8) + (t - t_c)/np.power(theta7, 2)
-
+"""
 """
 CDFs and inversions for sampling
 """
