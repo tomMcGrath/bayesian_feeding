@@ -14,7 +14,7 @@ import itertools
 Figure prelims
 """
 def compare_sample(df, data_dict, varlist, idx):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 	var = varlist[idx]
 	
 	def compare(row):
@@ -73,7 +73,7 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	k1 = 0.00055
 	theta7 = np.power(10., thetas[6])
 	theta8 = np.power(10., thetas[7])
-	fig, axes = plt.subplots(2,1, figsize=(10,10))
+	fig, axes = plt.subplots(2,1, figsize=(5,5))
 
 	bout_ts, stomach_ts = ts_from_data(data)
 
@@ -103,10 +103,10 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	ax2 = axes[0].twinx()
 
 	## Histogram of results
-	ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
+	#ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
 
 	## KDE of results
-	"""
+	
 	x_grid = np.arange(len(stomach_ts))
 	kde = scipy.stats.gaussian_kde(next_times, bw_method='silverman')
 	y = kde.evaluate(x_grid)
@@ -114,7 +114,7 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	ax2.fill_between(x_grid[int(start_time):], 0, y[int(start_time):], color='r', alpha=0.3)
 	ax2.set_ylim([0, 2.5*np.max(y)])
 	ax2.set_yticklabels([])
-	"""
+	
 	## Predict samples of stomach fullness
 	ts_predictions = []
 	i = 0
@@ -138,12 +138,12 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 
 	plt.subplots_adjust(hspace=0.1)
 
-	return fig, axes
+	return fig, axes, ax2
 
 def plot_ethogram(folder, num_animals, maxlen=None, downsample=10, ysize=50):
 	num_animals = min(num_animals, len(os.listdir(folder)))
 
-	fig, axes = plt.subplots(2*num_animals, 1, figsize=(10,10))
+	fig, axes = plt.subplots(2*num_animals, 1, figsize=(5,5))
 
 	for i, filename in enumerate(os.listdir(folder)):
 		if i >= num_animals:
@@ -181,8 +181,8 @@ def plot_ethogram(folder, num_animals, maxlen=None, downsample=10, ysize=50):
 """
 Figure 2
 """
-def pairplot(df, var1, var2, ctype='drug_c', transforms=[None, None]):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+def pairplot(df, var1, var2, ctype='drug_c', transforms=[None, None], figsize=(5,5)):
+	fig, axes = plt.subplots(1, figsize=figsize)
 
 	def plot_pairs(row):
 		x = row[var1]
@@ -217,7 +217,7 @@ def pairplot(df, var1, var2, ctype='drug_c', transforms=[None, None]):
 def trellisplot(df, varlist, transforms):
 	## Prepare the figure
 	num_vars = len(varlist)
-	fig, axes = plt.subplots(num_vars, num_vars, figsize=(10,10))
+	fig, axes = plt.subplots(num_vars, num_vars, figsize=(5,5))
 
 	## Plot the data
 	for i, var1 in enumerate(varlist):
@@ -233,12 +233,10 @@ def trellisplot(df, varlist, transforms):
 				dataset2 = np.power(10., -dataset2)
 
 			## Data on the lower diagonal
-			if i > j:
-				continue
 
 			## KDE/histogram on the diagonal
-			elif i == j:
-				axes[i,i].hist(dataset1, bins=20)
+			if i == j:
+				axes[i,i].hist(dataset1, bins=20, normed=True)
 
 			else:
 				axes[j, i].scatter(dataset1, dataset2, alpha=0.6)
@@ -258,7 +256,7 @@ def trellisplot(df, varlist, transforms):
 			if transform2 == 'pow10_inv':
 				dataset2 = np.power(10., -dataset2)
 
-			if i >= j:
+			if i == j:
 				continue
 
 			else:
@@ -268,13 +266,13 @@ def trellisplot(df, varlist, transforms):
 				slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x,y)
 
 				axes[j, i].plot(x, intercept + x*slope, c='k')
-				text = '$r^{2} = %0.2f$\n$p=%1.0e$' %(r_value**2, p_value)
-				axes[i, j].text(0.15, 0.4, text, fontsize=16)
+				#text = '$r^{2} = %0.2f$\n$p=%1.0e$' %(r_value**2, p_value)
+				#axes[i, j].text(0.15, 0.4, text, fontsize=8)
 
 	return fig, axes
 
 def univariate_posterior(data_dict, idx, groups_to_use, numbins=50, transform=None):
-	fig, axes = plt.subplots(2, 1, figsize=(10,10))
+	fig, axes = plt.subplots(2, 1, figsize=(5,5))
 
 	for key in data_dict.keys():
 		if key not in groups_to_use:
@@ -303,7 +301,7 @@ def univariate_posterior(data_dict, idx, groups_to_use, numbins=50, transform=No
 Figure 3
 """
 def IMI_curve(group_dict, num_points=10, num_resamples=10):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 	k1 = 0.00055
 
 	x0_vals = np.linspace(0, 20, num_points)
@@ -330,7 +328,7 @@ def IMI_curve(group_dict, num_points=10, num_resamples=10):
 	return fig, axes
 
 def IMI_fullness(df, cutoff=300):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 	k1 = 0.00055
 
 	def fullness_IMI(row):
@@ -364,7 +362,7 @@ def IMI_fullness(df, cutoff=300):
 	return fig, axes
 
 def IMI_prediction(df, num_samples=10, cutoff=300):
-	fig, axes = plt.subplots(3, 1, figsize=(10,10))
+	fig, axes = plt.subplots(3, 1, figsize=(5,5))
 	k1 = 0.00055
 
 	def predict_IMI(row):
@@ -429,7 +427,7 @@ def IMI_prediction(df, num_samples=10, cutoff=300):
 	return fig, axes
 
 def predict_IMI_full_post(df, data_dict, num_resamples=1, cutoff=300):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 	k1 = 0.00055
 
 	def predict_IMI(row):
@@ -491,7 +489,7 @@ def predict_IMI_full_post(df, data_dict, num_resamples=1, cutoff=300):
 	return fig, axes
 
 def IMI_prediction_KDEmax(df, num_samples=10, cutoff=300):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 	k1 = 0.00055
 
 	def predict_IMI(row):
@@ -549,7 +547,7 @@ def IMI_prediction_KDEmax(df, num_samples=10, cutoff=300):
 	return fig, axes
 
 def intake_fullness(df, cutoff=300):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 
 	def plot_meals(row):
 		## Import the meal data for this animal
@@ -587,7 +585,7 @@ def intake_fullness(df, cutoff=300):
 	return fig, axes
 
 def fullness_IMI(df, cutoff=300, exp_param=1.5):
-	fig, axes = plt.subplots(2, 1, figsize=(10,10))
+	fig, axes = plt.subplots(2, 1, figsize=(5,5))
 
 	p_lengths = []
 	def plot_data(row):
@@ -661,7 +659,7 @@ def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10, windowsize=2):
     means = np.array(means)
 
     ## Plot moving window
-    fig, axes = plt.subplots(1, figsize=(10,10))
+    fig, axes = plt.subplots(1, figsize=(5,5))
     axes.scatter(results[:,0], 
                  results[:,1], 
                  alpha=0.3, 
@@ -748,7 +746,7 @@ def plot_satiety_ratio(data_dir, cutoff=300, windowsize=2):
     means = np.array(means)
 
     ## Plot moving window
-    fig, axes = plt.subplots(1, figsize=(10,10))
+    fig, axes = plt.subplots(1, figsize=(5,5))
     axes.scatter(results[:,0], 
                  results[:,1], 
                  alpha=0.3, 
@@ -783,7 +781,7 @@ def plot_satiety_ratio(data_dir, cutoff=300, windowsize=2):
 Figure 4
 """
 def termination_prob(data_dict):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 
 	x_vals = np.linspace(0, 20,100)
 	for key in data_dict.keys():
@@ -799,8 +797,8 @@ def termination_prob(data_dict):
 
 	return fig, axes
 
-def termination_given_params(theta4, theta5):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+def termination_given_params(theta4, theta5, figsize=(2,2)):
+	fig, axes = plt.subplots(1, figsize=figsize)
 
 	x_vals = np.linspace(0, 30, 1000)
 	y = []
@@ -812,27 +810,28 @@ def termination_given_params(theta4, theta5):
 	return fig, axes
 
 
-def param_change_effect(data_dict, indiv, param_idx, delta, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+def param_change_effect(data_dict, indivs, param_idx, delta, num_samples=100, duration=8*60*60):
+	fig, axes = plt.subplots(len(indivs), 1, figsize=(5,5))
 
-	post = data_dict[indiv]
-	post = np.mean(post, axis=0)
-	perturbed_params = np.copy(post)
-	perturbed_params[param_idx] = perturbed_params[param_idx] + delta
-	
-	baseline_samples = []
-	perturbed_samples = []
-	for i in range(num_samples):
-		baseline_samples.append(3600*fs.sample(duration, post, 0)[1]/duration)
-		perturbed_samples.append(3600*fs.sample(duration, perturbed_params, 0)[1]/duration)
+	for i, indiv in enumerate(indivs):
+		post = data_dict[indiv]
+		post = np.mean(post, axis=0)
+		perturbed_params = np.copy(post)
+		perturbed_params[param_idx] = perturbed_params[param_idx] + delta
+		
+		baseline_samples = []
+		perturbed_samples = []
+		for j in range(num_samples):
+			baseline_samples.append(3600*fs.sample(duration, post, 0)[1]/duration)
+			perturbed_samples.append(3600*fs.sample(duration, perturbed_params, 0)[1]/duration)
 
-	axes.hist(baseline_samples, color='b', bins=20, normed=True, alpha=0.6)
-	axes.hist(perturbed_samples, color='r', bins=20, normed=True, alpha=0.6)
+		axes[i].hist(baseline_samples, color='b', bins=20, normed=True, alpha=0.6)
+		axes[i].hist(perturbed_samples, color='r', bins=20, normed=True, alpha=0.6)
 
 	return fig, axes
 
 def pairwise_param_changes(data_dict, indiv, delta=0.1, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 
 	post = data_dict[indiv]
 	post = np.mean(post, axis=0)
@@ -885,8 +884,8 @@ def meals_from_data(data, cutoff=300):
     return mealsizes, mealdurs, p_lengths
 
 
-def param_delta_curve(data_dict, indivs, param_idx, delta_range, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(5, 1, figsize=(10,10))
+def param_delta_curve(data_dict, indivs, param_idx, delta_range, num_samples=100, duration=8*60*60, figsize=(5,10)):
+	fig, axes = plt.subplots(5, 1, figsize=figsize)
 
 	for indiv in indivs:
 		post = data_dict[indiv]
@@ -962,19 +961,19 @@ def param_delta_curve(data_dict, indivs, param_idx, delta_range, num_samples=100
 			#y5_min.append(np.percentile(meal_counts, 5))
 			#y5_max.append(np.percentile(meal_counts, 95))	
 
-		axes[0].plot(delta_range, y1, c=c)
+		axes[0].plot(delta_range, y1, c=c, marker='o')
 		#axes[0].fill_between(delta_range, y1_min, y1_max, alpha=0.1, color=c)
 
-		axes[1].plot(delta_range, y2, c=c)
+		axes[1].plot(delta_range, y2, c=c, marker='o')
 		#axes[1].fill_between(delta_range, y2_min, y2_max, alpha=0.1, color=c)
 
-		axes[2].plot(delta_range, y3, c=c)
+		axes[2].plot(delta_range, y3, c=c, marker='o')
 		#axes[2].fill_between(delta_range, y3_min, y3_max, alpha=0.1, color=c)
 
-		axes[3].plot(delta_range, y4, c=c)
+		axes[3].plot(delta_range, y4, c=c, marker='o')
 		#axes[3].fill_between(delta_range, y4_min, y4_max, alpha=0.1, color=c)
 
-		axes[4].plot(delta_range, y5, c=c)
+		axes[4].plot(delta_range, y5, c=c, marker='o')
 		#axes[4].fill_between(delta_range, y5_min, y5_max, alpha=0.1, color=c)
 
 	return fig, axes
@@ -985,7 +984,7 @@ def param_delta_curve(data_dict, indivs, param_idx, delta_range, num_samples=100
 Figure 5
 """
 def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
-	fig, axes = plt.subplots(1, figsize=(10,10))
+	fig, axes = plt.subplots(1, figsize=(5,5))
 
 	## Do the sampling
 	amounts, ts_mean, ts_pc, last_ts = helpers.sample_protocol(data_dict, protocol, num_samples, cutoff)
@@ -1014,7 +1013,7 @@ def dosing_protocol(data_dict, protocol, num_samples=10, cutoff=300):
 
 def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default=2, num_samples=10, cutoff=300, pc=5):
 	## NOTE: default drug is the first one in the list
-	fig, axes = plt.subplots(3, 1, figsize=(10,10))
+	fig, axes = plt.subplots(3, 1, figsize=(5,10))
 
 	## Create protocol list
 	protocol_list = helpers.make_protocol_list(druglist, protocol_size, duration, min_default)
@@ -1032,6 +1031,7 @@ def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default
 	## Plot policy ranking
 	protocols_to_rank = zip(mean_amounts, protocol_list)
 	ranked_protocols = sorted(protocols_to_rank, key=lambda x:x[0])
+	protocol_info = ranked_protocols
 	xax = np.arange(len(mean_amounts))
 	amounts_to_plot = [i[0] for i in ranked_protocols] # extract amount eaten
 	axes[0].scatter(xax, amounts_to_plot) # could do errorbar for SEM if necessary/useful
@@ -1077,10 +1077,10 @@ def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default
 	axes[2].hist(opt_protocol[1], color='b', bins=20, normed=True, alpha=0.6)
 	axes[2].hist(pess_protocol[1], color='r', bins=20, normed=True, alpha=0.6)
 
-	return fig, axes, ranked_protocols
+	return fig, axes, protocol_info
 
 def behav_change_effect_group(data_dict, groupname, xmax, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(2, 1, figsize=(10,10))
+	fig, axes = plt.subplots(2, 1, figsize=(5,5))
 
 	post = data_dict[groupname]
 	post = np.mean(post, axis=0)
@@ -1104,7 +1104,7 @@ def behav_change_effect_group(data_dict, groupname, xmax, num_samples=100, durat
 	return fig, axes
 
 def behav_change_effect_indiv(df, xmax, thetas, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(8,1, figsize=(10,10))
+	fig, axes = plt.subplots(8,1, figsize=(5,5))
 
 	def calc_change(row):
 		post = row[thetas]
@@ -1128,8 +1128,8 @@ def behav_change_effect_indiv(df, xmax, thetas, num_samples=100, duration=8*60*6
 
 	return fig, axes
 
-def behav_response_curve(data_dict, indivs, delta_range, num_samples=100, duration=8*60*60):
-	fig, axes = plt.subplots(5, 1, figsize=(10,10))
+def behav_response_curve(data_dict, indivs, delta_range, num_samples=100, duration=8*60*60, figsize=(5,10)):
+	fig, axes = plt.subplots(5, 1, figsize=figsize)
 
 	for indiv in indivs:
 		post = data_dict[indiv]
@@ -1202,19 +1202,19 @@ def behav_response_curve(data_dict, indivs, delta_range, num_samples=100, durati
 			#y5_min.append(np.percentile(meal_counts, 5))
 			#y5_max.append(np.percentile(meal_counts, 95))	
 
-		axes[0].plot(delta_range, y1, c=c)
+		axes[0].plot(delta_range, y1, c=c, marker='o')
 		#axes[0].fill_between(delta_range, y1_min, y1_max, alpha=0.1, color=c)
 
-		axes[1].plot(delta_range, y2, c=c)
+		axes[1].plot(delta_range, y2, c=c, marker='o')
 		#axes[1].fill_between(delta_range, y2_min, y2_max, alpha=0.1, color=c)
 
-		axes[2].plot(delta_range, y3, c=c)
+		axes[2].plot(delta_range, y3, c=c, marker='o')
 		#axes[2].fill_between(delta_range, y3_min, y3_max, alpha=0.1, color=c)
 
-		axes[3].plot(delta_range, y4, c=c)
+		axes[3].plot(delta_range, y4, c=c, marker='o')
 		#axes[3].fill_between(delta_range, y4_min, y4_max, alpha=0.1, color=c)
 
-		axes[4].plot(delta_range, y5, c=c)
+		axes[4].plot(delta_range, y5, c=c, marker='o')
 		#axes[4].fill_between(delta_range, y5_min, y5_max, alpha=0.1, color=c)
 
 	return fig, axes

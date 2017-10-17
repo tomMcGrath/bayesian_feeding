@@ -159,6 +159,22 @@ def amt_from_file(path, filename):
     qty = rates*f_lengths
     return sum(qty)
 
+def amt_to_time(path, filename, maxtime):
+    filepath = path + '/' + filename
+    data = np.loadtxt(filepath, delimiter='\t', usecols=(0,1,2,3,4))
+
+    t_elapsed = 0.
+    food_intake = 0.
+    i = 0
+    while t_elapsed < maxtime and i < len(data):
+        t_elapsed += data[i, 0]
+        t_elapsed += data[i, 3]
+        food_intake += data[i,0]*data[i,2]
+
+        i += 1
+
+    return food_intake
+
 def cumulative_feeding(filename):
     data = np.loadtxt(filename, delimiter='\t', usecols=(0,1,2,3,4))
     
