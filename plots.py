@@ -781,8 +781,22 @@ def plot_satiety_ratio(data_dir, cutoff=300, windowsize=2):
     axes.plot(x_grid, ratio_predict, c='r')
     
     return fig, axes
-    
 
+def IMI_inset(theta7, theta8, num_samples=100, figsize=(2,2)):
+	fig, axes = plt.subplots(1, figsize=figsize)
+	k1 = 0.00055
+
+	x_vals = np.linspace(0, 20, 10)
+	y = []
+	for x in x_vals:
+		samples = []
+		for i in range(num_samples):
+			samples.append(fl.sample_L(x, k1, theta7, theta8))
+
+		y.append(np.mean(samples))
+
+	axes.plot(x_vals, y)
+	return fig, axes
 
 """
 Figure 4
