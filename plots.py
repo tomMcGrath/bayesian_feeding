@@ -76,59 +76,69 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	fig, axes = plt.subplots(2,1, figsize=(5,5))
 
 	bout_ts, stomach_ts = ts_from_data(data)
+	x_bout_sec = np.arange(len(bout_ts))
+	x_stom_sec = np.arange(len(stomach_ts))
+
+	x_bout_min = x_bout_sec/60
+	x_stom_min = x_stom_sec/60
+
+	print len(x_bout_sec), len(bout_ts), len(x_bout_min)
+	print len(x_bout_sec), len(bout_ts), len(x_bout_min)
 
 	## Plot the time series
-	axes[0].plot(bout_ts)
-	axes[1].plot(stomach_ts)
+	axes[0].plot(x_bout_sec, bout_ts)
+	axes[1].plot(x_stom_sec, stomach_ts)
 
+	ax2 = axes[1].twinx()
+	
 	## Now do the posterior prediction of next mealtime
 	## Get the time of the start of the intermeal interval we wish to predict
-	known_events = data[:predict_index]
-	start_time = 0
-	for event in known_events[:-1]: # only want feeding from the last one
-		start_time += event[0] + event[3]
+	# known_events = data[:predict_index]
+	# start_time = 0
+	# for event in known_events[:-1]: # only want feeding from the last one
+	# 	start_time += event[0] + event[3]
 
-	start_time += known_events[-1][0] # add the g_end_feeding
-	x0 = stomach_ts[int(start_time)]
+	# start_time += known_events[-1][0] # add the g_end_feeding
+	# x0 = stomach_ts[int(start_time)]
 
-	next_times = []
-	i = 0
-	while i < num_samples:
-		new_sample = fl.sample_L(x0, k1, theta7, theta8)
-		next_times.append(start_time + new_sample)
+	# next_times = []
+	# i = 0
+	# while i < num_samples:
+	# 	new_sample = fl.sample_L(x0, k1, theta7, theta8)
+	# 	next_times.append(start_time + new_sample)
 
-		i += 1
+	# 	i += 1
 
-	axes[0].set_ylim(0, 0.02)
-	ax2 = axes[0].twinx()
+	# axes[0].set_ylim(0, 0.02)
+	# ax2 = axes[0].twinx()
 
-	## Histogram of results
-	#ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
+	# ## Histogram of results
+	# #ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
 
-	## KDE of results
-	x_grid = np.arange(len(stomach_ts))
-	kde = scipy.stats.gaussian_kde(next_times, bw_method='silverman')
-	y = kde.evaluate(x_grid)
-	ax2.plot(x_grid[int(start_time):], y[int(start_time):], c='r')
-	ax2.fill_between(x_grid[int(start_time):30000], 0, y[int(start_time):30000], color='r', alpha=0.3)
-	ax2.set_ylim([0, 2.5*np.max(y)])
-	ax2.set_yticklabels([])
+	# ## KDE of results
+	# x_grid = np.arange(len(stomach_ts))
+	# kde = scipy.stats.gaussian_kde(next_times, bw_method='silverman')
+	# y = kde.evaluate(x_grid)
+	# ax2.plot(x_grid[int(start_time):], y[int(start_time):], c='r')
+	# ax2.fill_between(x_grid[int(start_time):30000], 0, y[int(start_time):30000], color='r', alpha=0.3)
+	# ax2.set_ylim([0, 2.5*np.max(y)])
+	# ax2.set_yticklabels([])
 	
-	## Predict samples of stomach fullness
-	ts_predictions = []
-	i = 0
-	while i < num_samples:
-		new_sample = fs.sample(tmax, thetas, x0, init_state='L')
-		ts_predictions.append(new_sample[0][:tmax])
-		i += 1
+	# ## Predict samples of stomach fullness
+	# ts_predictions = []
+	# i = 0
+	# while i < num_samples:
+	# 	new_sample = fs.sample(tmax, thetas, x0, init_state='L')
+	# 	ts_predictions.append(new_sample[0][:tmax])
+	# 	i += 1
 
-	ts_predictions = np.stack(ts_predictions)
-	x = start_time + np.arange(tmax) # offset to start time
+	# ts_predictions = np.stack(ts_predictions)
+	# x = start_time + np.arange(tmax) # offset to start time
 
-	## Plot mean
-	mean_ts = np.mean(ts_predictions, axis=0)
-	axes[1].plot(x, mean_ts, c='r')
-
+	# ## Plot mean
+	# mean_ts = np.mean(ts_predictions, axis=0)
+	# axes[1].plot(x, mean_ts, c='r')
+	
 	## Plot percentile
 	"""
 	pc = 5
@@ -136,13 +146,13 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	max_val = np.percentile(ts_predictions, 100-pc, axis=0)
 	axes[1].fill_between(x, min_val, max_val, alpha=0.3, color='r')
 	"""
+	
+	# ## Plot samples
+	# for i in range(5):
+	# 	axes[1].plot(x, ts_predictions[i, :], c='r', alpha=0.3)
 
-	## Plot samples
-	for i in range(5):
-		axes[1].plot(x, ts_predictions[i, :], c='r', alpha=0.3)
-
-	plt.subplots_adjust(hspace=0.1)
-
+	# plt.subplots_adjust(hspace=0.1)
+	
 	return fig, axes, ax2
 
 def plot_ethogram(folder, num_animals, maxlen=None, downsample=10, ysize=50):
@@ -639,7 +649,7 @@ def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10, windowsize=2):
             f_lengths, g_starts, rates, p_length, g_end = j
 
             if p_length > cutoff and p_length < err_thresh:
-                p_lengths.append(p_length)
+                p_lengths.append(p_length/60) # convert to minutes
                 g_ends.append(g_end)
                 c.append(float(i)/count)
 
@@ -689,7 +699,7 @@ def plot_IMI(data_dir, data_dict, cutoff=300, num_samples=10, windowsize=2):
         for i in range(num_samples):
             theta7 = np.power(10., post[6])
             theta8 = np.power(10., post[7])
-            samples.append(fl.sample_L(xval, k1, theta7, theta8))
+            samples.append(fl.sample_L(xval, k1, theta7, theta8)/60) # convert to minutes
             
         mean_ppcs.append(np.mean(samples))
         ppc_low = np.percentile(samples, 5)
@@ -722,11 +732,11 @@ def plot_satiety_ratio(data_dir, cutoff=300, windowsize=2):
             mealsize += 3.5*rate*f_length
             
             if p_length > cutoff and p_length < err_thresh:
-                p_lengths.append(p_length)
+                p_lengths.append(p_length/60) # convert to minutes
                 mealsizes.append(mealsize)
 
                 if mealnum == 0:
-                	ratios.append(float(p_length)/mealsize)
+                	ratios.append(float(p_length/60)/mealsize) # convert to minutes
                 	
                 mealsize = 0
                 c.append(float(i)/count)
@@ -791,7 +801,7 @@ def IMI_inset(theta7, theta8, num_samples=100, figsize=(2,2)):
 	for x in x_vals:
 		samples = []
 		for i in range(num_samples):
-			samples.append(fl.sample_L(x, k1, theta7, theta8))
+			samples.append(fl.sample_L(x, k1, theta7, theta8)/60) # convert to minutes
 
 		y.append(np.mean(samples))
 
@@ -903,6 +913,100 @@ def meals_from_data(data, cutoff=300):
             mealnum += 1
 
     return mealsizes, mealdurs, p_lengths
+
+def meal_stats_from_delta(data_dict, indiv, param_idxs, deltas, num_samples=100, duration=8*60*60, figsize=(10, 5)):
+	fig, axes = plt.subplots(1, 5, figsize=figsize)
+
+	post = data_dict[indiv]
+	post = np.mean(post, axis=0)
+	data = indiv.split('_')
+	c = helpers.get_colour(data[:4])
+
+	## Stats from perturbed posterior
+	perturbed_params = np.copy(post)
+	for i, param_idx in enumerate(param_idxs):
+		perturbed_params[param_idx] = perturbed_params[param_idx] + deltas[i]
+
+	baseline_amts = []
+	baseline_sizes = []
+	baseline_durs = []
+	baseline_IMIs = []
+	baseline_counts = []
+
+	perturbed_amts = []
+	perturbed_sizes = []
+	perturbed_durs = []
+	perturbed_IMIs = []
+	perturbed_counts = []
+
+	## TODO: finish
+
+	for i in range(num_samples):
+		## Sample from baseline
+		sample_data = fs.sample(duration, post, 0)
+		sample_amount = sample_data[1]
+		events = sample_data[-1]
+		baseline_amts.append(3600*sample_amount/duration)
+
+		mealsizes, mealdurs, p_lengths = meals_from_data(events)
+
+		baseline_sizes += mealsizes
+		baseline_durs += mealdurs
+		baseline_IMIs += p_lengths
+		baseline_counts.append(len(p_lengths))
+
+		## Sample from perturbed
+		sample_data = fs.sample(duration, perturbed_params, 0)
+		sample_amount = sample_data[1]
+		events = sample_data[-1]
+		perturbed_amts.append(3600*sample_amount/duration)
+
+		mealsizes, mealdurs, p_lengths = meals_from_data(events)
+
+		perturbed_sizes += mealsizes
+		perturbed_durs += mealdurs
+		perturbed_IMIs += p_lengths
+		perturbed_counts.append(len(p_lengths))
+
+	## Convert to minutes
+	baseline_IMIs = np.array(baseline_IMIs)
+	baseline_IMIs = baseline_IMIs/60.
+	baseline_durs = np.array(baseline_durs)
+	baseline_durs = baseline_durs/60.
+
+	perturbed_IMIs = np.array(perturbed_IMIs)
+	perturbed_IMIs = perturbed_IMIs/60.
+	perturbed_durs = np.array(perturbed_durs)
+	perturbed_durs = perturbed_durs/60.
+
+	## Bar plots for baseline
+	axes[0].bar(0, np.mean(baseline_amts), color='b', label='$\\theta_{0}$')
+	axes[1].bar(0, np.mean(baseline_sizes), color='b')
+	axes[2].bar(0, np.mean(baseline_durs), color='b')
+	axes[3].bar(0, np.mean(baseline_IMIs), color='b')
+	axes[4].bar(0, np.mean(baseline_counts), color='b')
+
+	## Bar plots for perturbed
+	axes[0].bar(1, np.mean(perturbed_amts), color='r', label='$\Delta \\theta$')
+	axes[1].bar(1, np.mean(perturbed_sizes), color='r')
+	axes[2].bar(1, np.mean(perturbed_durs), color='r')
+	axes[3].bar(1, np.mean(perturbed_IMIs), color='r')
+	axes[4].bar(1, np.mean(perturbed_counts), color='r')
+
+	axes[0].set_xticklabels([])
+	axes[1].set_xticklabels([])
+	axes[2].set_xticklabels([])
+	axes[3].set_xticklabels([])
+	axes[4].set_xticklabels([])
+
+	axes[0].legend()
+
+	return fig, axes
+
+
+
+
+
 
 
 def param_delta_curve(data_dict, indivs, param_idx, delta_range, num_samples=100, duration=8*60*60, figsize=(5,10)):
