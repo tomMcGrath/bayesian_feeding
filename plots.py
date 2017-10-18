@@ -106,12 +106,11 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	#ax2.hist(next_times, histtype='step', color='r', bins=100, normed=True)
 
 	## KDE of results
-	
 	x_grid = np.arange(len(stomach_ts))
 	kde = scipy.stats.gaussian_kde(next_times, bw_method='silverman')
 	y = kde.evaluate(x_grid)
 	ax2.plot(x_grid[int(start_time):], y[int(start_time):], c='r')
-	ax2.fill_between(x_grid[int(start_time):], 0, y[int(start_time):], color='r', alpha=0.3)
+	ax2.fill_between(x_grid[int(start_time):30000], 0, y[int(start_time):30000], color='r', alpha=0.3)
 	ax2.set_ylim([0, 2.5*np.max(y)])
 	ax2.set_yticklabels([])
 	
@@ -131,10 +130,16 @@ def timeseries_predict_plot(data, thetas, predict_index, num_samples=100, tmax=6
 	axes[1].plot(x, mean_ts, c='r')
 
 	## Plot percentile
+	"""
 	pc = 5
 	min_val = np.percentile(ts_predictions, pc, axis=0)
 	max_val = np.percentile(ts_predictions, 100-pc, axis=0)
 	axes[1].fill_between(x, min_val, max_val, alpha=0.3, color='r')
+	"""
+
+	## Plot samples
+	for i in range(5):
+		axes[1].plot(x, ts_predictions[i, :], c='r', alpha=0.3)
 
 	plt.subplots_adjust(hspace=0.1)
 
@@ -217,7 +222,7 @@ def pairplot(df, var1, var2, ctype='drug_c', transforms=[None, None], figsize=(5
 def trellisplot(df, varlist, transforms):
 	## Prepare the figure
 	num_vars = len(varlist)
-	fig, axes = plt.subplots(num_vars, num_vars, figsize=(5,5))
+	fig, axes = plt.subplots(num_vars, num_vars, figsize=(10,10))
 
 	## Plot the data
 	for i, var1 in enumerate(varlist):
@@ -272,7 +277,7 @@ def trellisplot(df, varlist, transforms):
 	return fig, axes
 
 def univariate_posterior(data_dict, idx, groups_to_use, numbins=50, transform=None):
-	fig, axes = plt.subplots(2, 1, figsize=(5,5))
+	fig, axes = plt.subplots(2, 1, figsize=(4,5))
 
 	for key in data_dict.keys():
 		if key not in groups_to_use:
@@ -294,6 +299,8 @@ def univariate_posterior(data_dict, idx, groups_to_use, numbins=50, transform=No
 		else:
 			axes[1].hist(dataset, bins=numbins, color=c, histtype='stepfilled', alpha=0.6, normed=True)
 
+	#axes[0].set_yticklabels([])
+	#axes[1].set_yticklabels([])
 
 	return fig, axes
 
