@@ -55,7 +55,7 @@ k1 = 0.00055
 ## Model setup
 with pm.Model() as model:
     ## Group mean
-    means = [-2, -2, -3, 1, 1, 0, 2, 2] # from unpooled data, all vars
+    means = [-2, -2, -3, 1, 1, -1, 3, 2] # from unpooled data, all vars
     num_vars = len(means)
     cov = np.eye(num_vars)
 
@@ -64,7 +64,7 @@ with pm.Model() as model:
     theta_holder = []
 
     ## Create covariance matrix from LKJ
-    sd_dist = pm.HalfNormal.dist(sd=1, shape=num_vars)
+    sd_dist = pm.HalfNormal.dist(sd=3, shape=num_vars)
     packed_chol = pm.LKJCholeskyCov('chol_cov', eta=1, n=num_vars, sd_dist=sd_dist)
     chol = pm.expand_packed_triangular(num_vars, packed_chol, lower=True)
 
