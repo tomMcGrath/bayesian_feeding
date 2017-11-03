@@ -155,8 +155,9 @@ def CDF_inv_L(u, x0, k1, theta7, theta8):
 
     try:
         ans = optimize.brentq(f_to_min, 0.0, 1e12, args=(u, x0, k1, theta7, theta8))
-    except RuntimeError:
-        ans = optimize.brentq(f_to_min, 0.0, 1e14, maxiter=1000, args=(u, x0, k1, theta7, theta8))
+    except:
+        #ans = optimize.brentq(f_to_min, 0.0, 1e16, maxiter=1000, args=(u, x0, k1, theta7, theta8))
+        ans = 12*60*60 # as long as is feasible
 
     return ans
 

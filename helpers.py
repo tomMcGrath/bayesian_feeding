@@ -1,9 +1,9 @@
+from datetime import datetime
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.cm as cm
-import pymc3 as pm
 import pandas as pd
 import fwd_sample as fs
 import itertools
@@ -520,24 +520,6 @@ def group_hist(trace, group_list, group_id_dict, theta_idx, recip=False):
 """
 Model functions
 """
-def get_Q(xvals, theta5, theta6, percentile=5):
-    def sig(x, theta5, theta6):
-        eps = 0.01
-        return eps + (1. - 2*eps)/(1. + np.exp(-0.1*theta5*(x-20*theta6)))
-
-    sigmoids = []
-    for i, t5_val in enumerate(theta5):
-        sigmoids.append(sig(xvals, t5_val, theta6[i]))
-
-    sigmoids = np.stack(sigmoids, axis=1)
-
-    sig_int = pm.stats.hpd(sigmoids.T)
-
-    sig_min = np.percentile(sigmoids, percentile, axis=1)
-    sig_mean = np.mean(sigmoids, axis=1)
-    sig_max = np.percentile(sigmoids, 100.-percentile, axis=1)
-    
-    return sig_min, sig_mean, sig_max, sig_int
 
 """
 Forward sampling helper functions
@@ -583,14 +565,15 @@ def sample_protocol(data_dict, protocol, num_samples, cutoff, pc=5):
         x0 = 0
         total_amount = 0
         time_series = [[x0]]
+        final_state = 'F'
         
         for state in protocol:
             duration = state[0]*3600
             post = np.mean(data_dict[state[1]], axis=0)
             x0 = time_series[-1][-1]
-            results = fs.sample(duration, post, x0, init_state='F')
+            results = fs.sample(duration, post, x0, init_state=final_state)
             
-            time_series.append(results[0])
+            time_series.append(results[0][:duration])
             total_amount += results[1]
             
             ## Use cutoff to check pause state
@@ -614,3 +597,15 @@ def sample_protocol(data_dict, protocol, num_samples, cutoff, pc=5):
     ts_pc = (ts_pc_low, ts_pc_high)
 
     return amounts, ts_mean, ts_pc, last_ts
+
+def sample_group(mu, cov, groupsize, duration):
+    thetas = np.random.multivariate_normal(mu, cov, size=groupsize)
+
+    amts = []
+    for i in range(groupsize):
+        t_start = datetime.now()
+        results = fs.sample(duration, thetas[i,:], 0)
+        t_end = datetime.now()
+        amts.append(results[1])
+
+    return amts

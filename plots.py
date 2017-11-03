@@ -9,6 +9,7 @@ import fwd_sample as fs
 import fwd_likelihoods as fl
 import scipy
 import itertools
+import datetime
 
 """
 Figure prelims
@@ -792,11 +793,11 @@ def plot_satiety_ratio(data_dir, cutoff=300, windowsize=2):
     
     return fig, axes
 
-def IMI_inset(theta7, theta8, num_samples=100, figsize=(2,2)):
+def IMI_inset(theta7, theta8, num_samples=100, figsize=(2,2), c='b'):
 	fig, axes = plt.subplots(1, figsize=figsize)
 	k1 = 0.00055
 
-	x_vals = np.linspace(0, 20, 10)
+	x_vals = np.linspace(0, 30, 10)
 	y = []
 	for x in x_vals:
 		samples = []
@@ -805,7 +806,7 @@ def IMI_inset(theta7, theta8, num_samples=100, figsize=(2,2)):
 
 		y.append(np.mean(samples))
 
-	axes.plot(x_vals, y)
+	axes.plot(x_vals, y, c=c)
 	return fig, axes
 
 """
@@ -836,7 +837,7 @@ def termination_given_params(theta4, theta5, figsize=(2,2)):
 	for x in x_vals:
 		y.append(fl.Q(x, theta4, theta5))
 
-	axes.plot(x_vals, y)
+	axes.plot(x_vals, y, c='k')
 	#axes.fill_between(x_vals, sig_min, sig_max, alpha=0.3)
 	return fig, axes
 
@@ -1179,15 +1180,16 @@ def optimise_protocols(data_dict, druglist, protocol_size, duration, min_default
 	pess_pc_high = pess_pc[1]
 	
 	xax = np.arange(len(opt_mean))
+	xax = xax/60.
 
-	axes[1].plot(opt_mean, c='b')
+	axes[1].plot(xax, opt_mean, c='b')
 	axes[1].fill_between(xax,
 				  		 opt_pc_low, 
 				  		 opt_pc_high,
 				  		 color='b',
 				  		 alpha=0.3)
 
-	axes[1].plot(pess_mean, c='r')
+	axes[1].plot(xax, pess_mean, c='r')
 	axes[1].fill_between(xax,
 			  		 	 pess_pc_low, 
 			  			 pess_pc_high,
@@ -1341,5 +1343,182 @@ def behav_response_curve(data_dict, indivs, delta_range, num_samples=100, durati
 
 		axes[4].plot(delta_range, y5, c=c, marker='o')
 		#axes[4].fill_between(delta_range, y5_min, y5_max, alpha=0.1, color=c)
+
+	return fig, axes
+
+def refractory_period(data_dict, indivs, period_range, num_samples=100, duration=8*60*60, figsize=(5,10)):
+	fig, axes = plt.subplots(3, 1, figsize=figsize)
+	fig2, axes2 = plt.subplots(2, 1, figsize=(5,5))
+
+	for indiv in indivs:
+		print 'Generating samples for %s' %(indiv)
+		post = data_dict[indiv]
+		post = np.mean(post, axis=0)
+		data = indiv.split('_')
+		c = helpers.get_colour(data[:4])
+
+		y1 = []
+		y1_min = []
+		y1_max = []
+
+		y2 = []
+		y2_min = []
+		y2_max = []
+
+		y3 = []
+		y3_min = []
+		y3_max = []
+
+		y4 = []
+		y4_min = []
+		y4_max = []
+
+		y5 = []
+		y5_min = []
+		y5_max = []
+
+		for period in period_range:
+			sample_amts = []
+			sample_sizes = []
+			sample_durs = []
+			sample_IMIs = []
+			meal_counts = []
+			for i in range(num_samples):
+				sample_data = fs.sample_refractory(duration, post, 0, period)
+				sample_amount = sample_data[1]
+				events = sample_data[-1]
+				sample_amts.append(3600*sample_amount/duration)
+
+				mealsizes, mealdurs, p_lengths = meals_from_data(events)
+
+				sample_sizes += mealsizes
+				sample_durs += mealdurs
+				sample_IMIs += p_lengths
+				meal_counts.append(len(p_lengths))
+
+			## Normalised feeding amount distribution
+			y1.append(np.mean(sample_amts))
+			#y1_min.append(np.percentile(sample_amts, 5))
+			#y1_max.append(np.percentile(sample_amts, 95))
+
+			## Meal size
+			y2.append(np.mean(sample_sizes))
+			#y2_min.append(np.percentile(sample_sizes, 5))
+			#y2_max.append(np.percentile(sample_sizes, 95))
+
+			## Meal duration
+			y3.append(np.mean(sample_durs)/60.)
+			#y3_min.append(np.percentile(sample_durs, 5))
+			#y3_max.append(np.percentile(sample_durs, 95))
+
+			## Intermeal interval
+			y4.append(np.mean(sample_IMIs)/60.) # convert to minutes
+			#y4_min.append(np.percentile(sample_IMIs, 5))
+			#y4_max.append(np.percentile(sample_IMIs, 95))			
+
+			## Meal count
+			#print meal_counts	
+			y5.append(np.mean(meal_counts))
+			#y5_min.append(np.percentile(meal_counts, 5))
+			#y5_max.append(np.percentile(meal_counts, 95))
+
+			if period == period_range[0]:
+				axes2[0].hist(np.array(sample_IMIs)/60, color=c, alpha=0.6, bins=20, normed=True)
+
+			if period == period_range[-1]:
+				axes2[1].hist(np.array(sample_IMIs)/60, color=c, alpha=0.6, bins=20, normed=True)
+		"""
+		axes[0].plot(period_range/60., y5, c=c, marker='o')
+		#axes[0].fill_between(delta_range, y1_min, y1_max, alpha=0.1, color=c)
+
+		axes[1].plot(period_range/60., y2, c=c, marker='o')
+		#axes[1].fill_between(delta_range, y2_min, y2_max, alpha=0.1, color=c)
+		"""
+		axes[0].plot(period_range/60., y3, c=c, marker='o')
+		#axes[2].fill_between(delta_range, y3_min, y3_max, alpha=0.1, color=c)
+
+		axes[1].plot(period_range/60., y1, c=c, marker='o')
+		#axes[3].fill_between(delta_range, y4_min, y4_max, alpha=0.1, color=c)
+
+		axes[2].plot(period_range/60., y4, c=c, marker='o')
+		#axes[4].fill_between(delta_range, y5_min, y5_max, alpha=0.1, color=c)
+
+	return fig, axes, fig2, axes2
+
+def power_study_false_pos(trace, num_repeats, duration, figsize=(5,5)):
+	fig, axes = plt.subplots(1, figsize=figsize)
+	
+	chol = trace['chol_cov']
+	means = trace['mu']
+
+	trace_size = means.shape[0]
+	samplesizes = np.arange(5, 50, 5)
+
+	p_thresh = 0.05
+
+	false_pos = []
+	for samplesize in samplesizes:
+		num_fp = 0
+		for i in range(num_repeats):
+			## Generate group-level parameters by sampling posterior
+			use_idx = np.random.randint(trace_size)
+			use_chol = chol[use_idx, :]
+			cov = helpers.cov_from_chol(8, use_chol)
+			mu = means[use_idx, :]
+
+			group1 = helpers.sample_group(mu, cov, samplesize, duration)
+			group2 = helpers.sample_group(mu, cov, samplesize, duration)
+
+			tstat, pval = scipy.stats.ttest_ind(group1, group2, equal_var=False)
+
+			if pval/2 < p_thresh and tstat > 0:
+				num_fp += 1.
+
+		false_pos.append(num_fp/num_repeats)
+
+	axes.plot(samplesizes, false_pos)
+
+
+	return fig, axes
+
+def power_study_false_neg(trace1, trace2, num_repeats, duration, figsize=(5,5)):
+	fig, axes = plt.subplots(1, figsize=figsize)
+	
+	chol1 = trace1['chol_cov']
+	means1 = trace1['mu']
+
+	chol2 = trace2['chol_cov']
+	means2 = trace2['mu']
+
+	trace_size = means1.shape[0]
+	samplesizes = np.arange(5, 50, 5)
+
+	p_thresh = 0.05
+
+	false_neg = []
+	for samplesize in samplesizes:
+		num_accept = 0
+		for i in range(num_repeats):
+			## Generate group-level parameters by sampling posterior
+			use_idx = np.random.randint(trace_size)
+			use_chol1 = chol1[use_idx, :]
+			cov1 = helpers.cov_from_chol(8, use_chol1)
+			mu1 = means1[use_idx, :]
+
+			use_chol2 = chol2[use_idx, :]
+			cov2 = helpers.cov_from_chol(8, use_chol2)
+			mu2 = means2[use_idx, :]
+
+			group1 = helpers.sample_group(mu1, cov1, samplesize, duration)
+			group2 = helpers.sample_group(mu2, cov2, samplesize, duration)
+
+			tstat, pval = scipy.stats.ttest_ind(group1, group2, equal_var=False)
+
+			if pval/2 < p_thresh and tstat > 0:
+				num_accept += 1.
+
+		false_neg.append(100*(num_repeats - num_accept)/num_repeats)
+
+	axes.plot(samplesizes, false_neg)
 
 	return fig, axes
